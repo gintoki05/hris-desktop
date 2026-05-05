@@ -77,7 +77,6 @@ Agents must not run project workflow commands by default.
 
 Do not run:
 
-- `npm install`
 - `npm run build`
 - `npm run dev`
 - `npm run tauri dev`
@@ -87,6 +86,8 @@ Do not run:
 - `cargo run`
 - test commands
 - commands that open desktop windows, installers, or GUI apps
+
+Agents may run dependency installation commands when needed for the current task, but must keep dependencies minimal, well-maintained, compatible with the offline-first desktop direction, and avoid server/cloud/SaaS dependencies unless the user explicitly asks.
 
 Agents may run read-only inspection commands:
 

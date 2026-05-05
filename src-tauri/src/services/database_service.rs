@@ -25,9 +25,10 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    id: "202605050001_foundation_schema",
-    sql: "
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        id: "202605050001_foundation_schema",
+        sql: "
         CREATE TABLE IF NOT EXISTS company_settings (
             id TEXT PRIMARY KEY,
             company_name TEXT NOT NULL,
@@ -102,7 +103,49 @@ const MIGRATIONS: &[Migration] = &[Migration {
             created_at TEXT NOT NULL
         );
     ",
-}];
+    },
+    Migration {
+        id: "202605050002_auth_schema",
+        sql: "
+        CREATE TABLE IF NOT EXISTS auth_roles (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            role_id TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            password_algorithm TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            last_login_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (role_id) REFERENCES auth_roles(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES auth_users(id)
+        );
+
+        INSERT OR IGNORE INTO auth_roles (id, name, description, created_at, updated_at)
+        VALUES
+            ('admin_payroll', 'Admin Payroll', 'Mengelola master data, absensi, payroll, slip, dan backup.', datetime('now'), datetime('now')),
+            ('owner_management', 'Owner/Manajemen', 'Melihat dashboard, laporan, slip, dan ringkasan payroll.', datetime('now'), datetime('now')),
+            ('viewer', 'Viewer', 'Melihat data terbatas tanpa aksi perubahan.', datetime('now'), datetime('now'));
+    ",
+    },
+];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {
     let paths = resolve_database_paths(app)?;
