@@ -20,7 +20,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -369,6 +371,164 @@ h1 {
   padding: 14px 18px;
 }
 
+.success-alert {
+  background: #edf7f3;
+  border-top: 1px solid #b8d4c8;
+  color: #0f513d;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 14px 18px;
+}
+
+.readonly-note {
+  background: #f8fafc;
+  border-top: 1px solid #e2e7ed;
+  color: #526173;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 14px 18px;
+}
+
+.settings-content {
+  padding: 18px;
+}
+
+.settings-form-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.settings-fieldset {
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  min-width: 0;
+  padding: 16px;
+}
+
+.settings-fieldset legend {
+  color: #17202a;
+  font-size: 15px;
+  font-weight: 750;
+  padding: 0 5px;
+}
+
+.settings-fieldset label {
+  color: #334155;
+  display: grid;
+  font-size: 13px;
+  font-weight: 650;
+  gap: 7px;
+}
+
+.settings-fieldset input,
+.settings-fieldset select,
+.settings-fieldset textarea {
+  background: #ffffff;
+  border: 1px solid #b9c2cf;
+  border-radius: 6px;
+  color: #17202a;
+  min-height: 38px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.settings-fieldset textarea {
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.settings-fieldset input:focus,
+.settings-fieldset select:focus,
+.settings-fieldset textarea:focus {
+  border-color: #23604a;
+  outline: 2px solid #cde7dc;
+}
+
+.settings-fieldset:disabled input,
+.settings-fieldset:disabled select,
+.settings-fieldset:disabled textarea {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.settings-two-columns {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-actions {
+  border-bottom: 1px solid #e2e7ed;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-bottom: 16px;
+}
+
+.settings-actions button {
+  background: #14543f;
+  border: 1px solid #14543f;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 9px 14px;
+}
+
+.settings-actions button:disabled {
+  background: #8aa39a;
+  border-color: #8aa39a;
+}
+
+.audit-list {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+}
+
+.audit-list h3 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.audit-list p {
+  color: #526173;
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
+.audit-row {
+  align-items: center;
+  border-top: 1px solid #e2e7ed;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 150px minmax(0, 1fr) 150px;
+  padding-top: 8px;
+}
+
+.audit-row strong,
+.audit-row span,
+.audit-row time {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.audit-row span {
+  color: #334155;
+}
+
+.audit-row time {
+  color: #627084;
+  text-align: right;
+}
+
 .action-row {
   display: flex;
   flex-wrap: wrap;
@@ -442,5 +602,9 @@ h1 {
 
   .status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-form-grid {
+    grid-template-columns: 1fr;
   }
 }

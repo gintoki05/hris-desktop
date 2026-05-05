@@ -145,6 +145,93 @@ const MIGRATIONS: &[Migration] = &[
             ('viewer', 'Viewer', 'Melihat data terbatas tanpa aksi perubahan.', datetime('now'), datetime('now'));
     ",
     },
+    Migration {
+        id: "202605050003_master_settings_schema",
+        sql: "
+        ALTER TABLE company_settings ADD COLUMN contact_phone TEXT NOT NULL DEFAULT '';
+        ALTER TABLE company_settings ADD COLUMN contact_email TEXT NOT NULL DEFAULT '';
+
+        INSERT OR IGNORE INTO company_settings (
+            id,
+            company_name,
+            address,
+            treasurer_name,
+            contact_phone,
+            contact_email,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            'default',
+            'Klinik Permata Medika',
+            '',
+            '',
+            '',
+            '',
+            datetime('now'),
+            datetime('now')
+        );
+
+        CREATE TABLE IF NOT EXISTS payroll_settings (
+            id TEXT PRIMARY KEY,
+            current_year INTEGER NOT NULL,
+            payday_type TEXT NOT NULL CHECK (payday_type IN ('day_of_month', 'weekday')),
+            payday_day_of_month INTEGER CHECK (
+                payday_day_of_month IS NULL OR payday_day_of_month BETWEEN 1 AND 31
+            ),
+            payday_weekday TEXT CHECK (
+                payday_weekday IS NULL
+                OR payday_weekday IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')
+            ),
+            working_days_per_week INTEGER NOT NULL CHECK (working_days_per_week BETWEEN 1 AND 7),
+            late_tolerance_minutes INTEGER NOT NULL CHECK (late_tolerance_minutes >= 0),
+            late_penalty_amount INTEGER NOT NULL CHECK (late_penalty_amount >= 0),
+            early_leave_tolerance_minutes INTEGER NOT NULL CHECK (early_leave_tolerance_minutes >= 0),
+            early_leave_penalty_amount INTEGER NOT NULL CHECK (early_leave_penalty_amount >= 0),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO payroll_settings (
+            id,
+            current_year,
+            payday_type,
+            payday_day_of_month,
+            payday_weekday,
+            working_days_per_week,
+            late_tolerance_minutes,
+            late_penalty_amount,
+            early_leave_tolerance_minutes,
+            early_leave_penalty_amount,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            'default',
+            CAST(strftime('%Y', 'now') AS INTEGER),
+            'day_of_month',
+            25,
+            NULL,
+            6,
+            0,
+            0,
+            0,
+            0,
+            datetime('now'),
+            datetime('now')
+        );
+
+        CREATE TABLE IF NOT EXISTS settings_audit_events (
+            id TEXT PRIMARY KEY,
+            setting_scope TEXT NOT NULL CHECK (setting_scope IN ('company', 'payroll', 'master_settings')),
+            actor_user_id TEXT NOT NULL,
+            actor_display_name TEXT NOT NULL,
+            actor_role TEXT NOT NULL,
+            change_summary TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {
@@ -190,6 +277,13 @@ pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppE
 
 pub fn resolve_database_file(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(resolve_database_paths(app)?.database_path)
+}
+
+pub fn open_local_connection(app: &AppHandle) -> Result<Connection, AppError> {
+    let database_path = resolve_database_file(app)?;
+    let connection = Connection::open(database_path)?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    Ok(connection)
 }
 
 pub fn resolve_backup_directory(app: &AppHandle) -> Result<PathBuf, AppError> {

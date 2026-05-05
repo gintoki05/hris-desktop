@@ -5,6 +5,7 @@ import { LoginPanel } from "./features/auth/components/LoginPanel";
 import { useAuthSession } from "./features/auth/hooks/useAuthSession";
 import type { AuthPermission } from "./features/auth/types";
 import { FoundationStatusPanel } from "./features/settings/components/FoundationStatusPanel";
+import { MasterSettingsPanel } from "./features/settings/components/MasterSettingsPanel";
 import { getFoundationStatus } from "./features/settings/services/foundation.service";
 import type { FoundationStatus } from "./features/settings/types";
 
@@ -113,6 +114,11 @@ function App() {
       </section>
 
       <FoundationStatusPanel errorMessage={errorMessage} status={status} />
+
+      <MasterSettingsPanel
+        canEdit={auth.can("master-data:manage")}
+        session={auth.session}
+      />
 
       <section className="panel">
         <div className="panel-header">

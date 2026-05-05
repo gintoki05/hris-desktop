@@ -10,7 +10,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::database::initialize_local_database,
             commands::backup::create_local_database_backup,
-            commands::backup::restore_local_database_backup
+            commands::backup::restore_local_database_backup,
+            commands::settings::get_master_settings,
+            commands::settings::update_master_settings
         ])
         .run(tauri::generate_context!());
 
