@@ -111,6 +111,39 @@ Implement one Linear issue or one clearly stated task at a time.
 - Do not change architecture decisions without explaining the tradeoff first.
 - Do not add server/cloud dependencies unless explicitly requested.
 
+## Linear Workflow
+
+Linear is the source of truth for project planning and implementation scope.
+
+Use the project `HRIS Payroll Klinik Permata Medika` when creating or updating project artifacts.
+
+Default rules:
+
+- Work on one Linear issue at a time.
+- If the user names an issue ID, treat that issue as the active scope.
+- Do not create new Linear issues, milestones, or documents unless the user asks for planning, backlog updates, or Linear updates.
+- Do not mark an issue `Done` unless the acceptance criteria are met or the user explicitly asks.
+- If blocked, leave the issue open and add a comment describing the blocker and the next action.
+- If a decision affects future implementation, record it as a Linear document or issue comment when the user asks to keep Linear updated.
+
+Recommended issue status behavior:
+
+- Move an issue to `In Progress` when implementation work actually starts.
+- Leave an issue in progress if manual verification is still pending.
+- Move an issue to `Done` only after the user confirms manual verification or the task is documentation/planning-only and its deliverable is complete.
+
+Linear comments should be concise and useful:
+
+- What changed
+- Files or documents affected
+- Manual verification status
+- Known blockers or follow-up work
+- Any product/architecture decisions made
+
+Do not paste large diffs into Linear comments. Link or summarize instead.
+
+For implementation issues, final assistant responses should mention whether Linear was updated and what remains pending.
+
 ## Frontend Architecture
 
 Keep React code modular, reusable, and boring.
@@ -169,6 +202,37 @@ React clean code rules:
 - Use `type` for data shapes and `interface` only when extension is expected.
 - Prefer pure functions for payroll, attendance, and payslip calculations.
 - Keep calculations deterministic and easy to unit test.
+
+## State Management
+
+Use React local state by default for component-local UI state.
+
+Zustand may be used for app-level UI state, such as:
+
+- Active navigation/sidebar state
+- Selected payroll period
+- Selected employee or active row
+- App preferences
+- Theme
+- Global dialog/toast coordination
+- Table filter drafts that are shared across screens
+
+Do not use Zustand as the primary store for persisted domain data.
+
+Persisted data must flow through feature services and repository interfaces:
+
+- Employees
+- Attendance
+- Payroll runs
+- Payroll snapshots
+- Payslips
+- Payroll settings
+
+Avoid duplicating SQLite-backed data into global state unless there is a clear caching reason. If async data caching becomes necessary, discuss adding a query/cache layer first instead of expanding Zustand into a domain database.
+
+For complex forms, prefer `react-hook-form` plus schema validation when form complexity justifies it.
+
+For complex tables, prefer a table abstraction such as TanStack Table when sorting, filtering, pagination, and column state become non-trivial.
 
 ## Business Logic
 

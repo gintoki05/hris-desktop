@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "hris",
+  "productName": "HRIS Payroll Klinik",
   "version": "0.1.0",
   "identifier": "com.ajiep.hris",
   "build": {
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "hris",
-        "width": 800,
-        "height": 600
+        "title": "HRIS Payroll Klinik",
+        "width": 1200,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 640
       }
     ],
     "security": {

@@ -1,50 +1,89 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import { AdminLayout } from "./components/layout/AdminLayout";
+import { FoundationStatusPanel } from "./features/settings/components/FoundationStatusPanel";
+import { getFoundationStatus } from "./features/settings/services/foundation.service";
+import type { FoundationStatus } from "./features/settings/types";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [status, setStatus] = useState<FoundationStatus | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  useEffect(() => {
+    let isMounted = true;
+
+    getFoundationStatus()
+      .then((nextStatus) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setStatus(nextStatus);
+        setErrorMessage(null);
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : "Gagal menyiapkan database lokal.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const modules = useMemo(
+    () => [
+      {
+        name: "Master Data",
+        description: "Perusahaan, karyawan, komponen payroll, dan pengaturan periode.",
+        status: "Siap dikembangkan",
+      },
+      {
+        name: "Absensi",
+        description: "Import Excel/fingerprint, input manual izin, sakit, cuti, lembur, dan koreksi.",
+        status: "Service placeholder",
+      },
+      {
+        name: "Payroll",
+        description: "Perhitungan deterministic dari snapshot absensi dan master payroll.",
+        status: "Service placeholder",
+      },
+      {
+        name: "Slip PDF",
+        description: "Generate slip dari payroll final tanpa membaca live master data.",
+        status: "Offline-ready placeholder",
+      },
+    ],
+    [],
+  );
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <AdminLayout>
+      <section className="page-header">
+        <div>
+          <p className="eyebrow">HRIS Payroll Klinik</p>
+          <h1>Fondasi Desktop Offline</h1>
+        </div>
+        <span className="offline-badge">Offline-first</span>
+      </section>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      <FoundationStatusPanel errorMessage={errorMessage} status={status} />
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+      <section className="module-grid" aria-label="Modul V1">
+        {modules.map((module) => (
+          <article className="module-card" key={module.name}>
+            <div>
+              <h2>{module.name}</h2>
+              <p>{module.description}</p>
+            </div>
+            <span>{module.status}</span>
+          </article>
+        ))}
+      </section>
+    </AdminLayout>
   );
 }
 
