@@ -12,7 +12,11 @@ pub fn run() {
             commands::backup::create_local_database_backup,
             commands::backup::restore_local_database_backup,
             commands::settings::get_master_settings,
-            commands::settings::update_master_settings
+            commands::settings::update_master_settings,
+            commands::employees::list_employees,
+            commands::employees::create_employee,
+            commands::employees::update_employee,
+            commands::employees::deactivate_employee
         ])
         .run(tauri::generate_context!());
 

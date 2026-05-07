@@ -249,6 +249,81 @@ const MIGRATIONS: &[Migration] = &[
         CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
     ",
     },
+    Migration {
+        id: "202605070002_attendance_master_data",
+        sql: "
+        CREATE TABLE IF NOT EXISTS work_shifts (
+            id TEXT PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            break_minutes INTEGER NOT NULL DEFAULT 0 CHECK (break_minutes >= 0),
+            is_off INTEGER NOT NULL DEFAULT 0 CHECK (is_off IN (0, 1)),
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS attendance_codes (
+            id TEXT PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL CHECK (category IN ('present', 'sick', 'leave', 'absence', 'off')),
+            counts_as_workday INTEGER NOT NULL DEFAULT 1 CHECK (counts_as_workday IN (0, 1)),
+            is_paid INTEGER NOT NULL DEFAULT 1 CHECK (is_paid IN (0, 1)),
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS overtime_rules (
+            id TEXT PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            applies_to TEXT NOT NULL CHECK (applies_to IN ('workday', 'holiday')),
+            multiplier REAL NOT NULL CHECK (multiplier >= 0),
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO work_shifts (
+            id, code, name, start_time, end_time, break_minutes, is_off, is_active, sort_order, created_at, updated_at
+        )
+        VALUES
+            ('shift-pagi', 'PAGI', 'Shift Pagi', '07:00', '14:00', 0, 0, 1, 10, datetime('now'), datetime('now')),
+            ('shift-siang', 'SIANG', 'Shift Siang', '14:00', '21:00', 0, 0, 1, 20, datetime('now'), datetime('now')),
+            ('shift-middle', 'MIDDLE', 'Shift Middle', '10:00', '17:00', 0, 0, 1, 30, datetime('now'), datetime('now')),
+            ('shift-non-shift', 'NONSHIFT', 'Non-shift', '08:00', '16:00', 60, 0, 1, 40, datetime('now'), datetime('now')),
+            ('shift-off', 'OFF', 'Off', '00:00', '00:00', 0, 1, 1, 50, datetime('now'), datetime('now'));
+
+        INSERT OR IGNORE INTO attendance_codes (
+            id, code, name, category, counts_as_workday, is_paid, is_active, sort_order, created_at, updated_at
+        )
+        VALUES
+            ('attendance-present', 'H', 'Hadir', 'present', 1, 1, 1, 10, datetime('now'), datetime('now')),
+            ('attendance-sick', 'S', 'Sakit', 'sick', 1, 1, 1, 20, datetime('now'), datetime('now')),
+            ('attendance-permit', 'I', 'Izin', 'leave', 1, 1, 1, 30, datetime('now'), datetime('now')),
+            ('attendance-leave', 'C', 'Cuti', 'leave', 1, 1, 1, 40, datetime('now'), datetime('now')),
+            ('attendance-absence', 'A', 'Alpa', 'absence', 1, 0, 1, 50, datetime('now'), datetime('now')),
+            ('attendance-off', 'OFF', 'Off', 'off', 0, 0, 1, 60, datetime('now'), datetime('now'));
+
+        INSERT OR IGNORE INTO overtime_rules (
+            id, code, name, applies_to, multiplier, is_active, sort_order, created_at, updated_at
+        )
+        VALUES
+            ('overtime-workday', 'LEMBUR_HARIAN', 'Lembur Harian', 'workday', 1.5, 1, 10, datetime('now'), datetime('now')),
+            ('overtime-holiday', 'LEMBUR_LIBUR', 'Lembur Hari Libur', 'holiday', 2.0, 1, 20, datetime('now'), datetime('now'));
+
+        CREATE INDEX IF NOT EXISTS idx_work_shifts_active ON work_shifts(is_active);
+        CREATE INDEX IF NOT EXISTS idx_attendance_codes_active ON attendance_codes(is_active);
+        CREATE INDEX IF NOT EXISTS idx_overtime_rules_active ON overtime_rules(is_active);
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {
