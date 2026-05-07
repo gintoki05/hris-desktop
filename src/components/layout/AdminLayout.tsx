@@ -3,27 +3,46 @@ import { AUTH_ROLE_LABELS } from "../../features/auth/constants";
 import type { AuthPermission, AuthSession } from "../../features/auth/types";
 
 type NavItem = {
+  id: AdminPage;
   label: string;
   permission: AuthPermission;
 };
 
+export type AdminPage =
+  | "dashboard"
+  | "master-data"
+  | "attendance"
+  | "payroll"
+  | "reports"
+  | "payslips"
+  | "backup";
+
 type AdminLayoutProps = PropsWithChildren<{
+  activePage: AdminPage;
   session: AuthSession;
   can: (permission: AuthPermission) => boolean;
   onLogout: () => Promise<void>;
+  onNavigate: (page: AdminPage) => void;
 }>;
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", permission: "dashboard:view" },
-  { label: "Master Data", permission: "master-data:manage" },
-  { label: "Absensi", permission: "attendance:manage" },
-  { label: "Payroll", permission: "payroll:manage" },
-  { label: "Laporan", permission: "reports:view" },
-  { label: "Slip PDF", permission: "payslips:view" },
-  { label: "Backup", permission: "backup:manage" },
+  { id: "dashboard", label: "Dashboard", permission: "dashboard:view" },
+  { id: "master-data", label: "Master Data", permission: "master-data:manage" },
+  { id: "attendance", label: "Absensi", permission: "attendance:manage" },
+  { id: "payroll", label: "Payroll", permission: "payroll:manage" },
+  { id: "reports", label: "Laporan", permission: "reports:view" },
+  { id: "payslips", label: "Slip PDF", permission: "payslips:view" },
+  { id: "backup", label: "Backup", permission: "backup:manage" },
 ];
 
-export function AdminLayout({ can, children, onLogout, session }: AdminLayoutProps) {
+export function AdminLayout({
+  activePage,
+  can,
+  children,
+  onLogout,
+  onNavigate,
+  session,
+}: AdminLayoutProps) {
   return (
     <div className="admin-layout">
       <aside className="sidebar">
@@ -32,16 +51,19 @@ export function AdminLayout({ can, children, onLogout, session }: AdminLayoutPro
           <span>Klinik Permata Medika</span>
         </div>
         <nav className="nav-list" aria-label="Navigasi utama">
-          {navItems.map((item, index) => (
-            <div
+          {navItems.map((item) => (
+            <button
               className="nav-item"
-              data-active={index === 0}
+              data-active={item.id === activePage}
               data-disabled={!can(item.permission)}
+              disabled={!can(item.permission)}
               key={item.label}
+              onClick={() => onNavigate(item.id)}
+              type="button"
             >
               <span className="nav-dot" aria-hidden="true" />
               {item.label}
-            </div>
+            </button>
           ))}
         </nav>
         <div className="session-panel">

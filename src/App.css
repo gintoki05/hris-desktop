@@ -195,12 +195,16 @@ button:disabled {
 
 .nav-item {
   align-items: center;
+  background: transparent;
+  border: 0;
   border-radius: 6px;
   color: #334155;
   display: flex;
   font-size: 14px;
   gap: 10px;
   padding: 10px 12px;
+  text-align: left;
+  width: 100%;
 }
 
 .nav-item[data-active="true"] {
@@ -211,6 +215,10 @@ button:disabled {
 
 .nav-item[data-disabled="true"] {
   color: #94a3b8;
+}
+
+.nav-item:disabled {
+  cursor: not-allowed;
 }
 
 .nav-item[data-disabled="true"] .nav-dot {
@@ -306,6 +314,37 @@ h1 {
   white-space: nowrap;
 }
 
+.page-tabs {
+  align-items: center;
+  background: #e2e7ed;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  display: inline-grid;
+  gap: 1px;
+  grid-auto-flow: column;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.page-tab {
+  background: #f8fafc;
+  border: 0;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 9px 16px;
+}
+
+.page-tab:hover {
+  background: #ffffff;
+}
+
+.page-tab[aria-selected="true"] {
+  background: #14543f;
+  color: #ffffff;
+}
+
 .panel {
   background: #ffffff;
   border: 1px solid #d9dee5;
@@ -389,6 +428,14 @@ h1 {
   line-height: 1.5;
   margin: 0;
   padding: 14px 18px;
+}
+
+.empty-panel-note {
+  color: #526173;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 18px;
 }
 
 .settings-content {
@@ -939,6 +986,157 @@ h1 {
   color: #94a3b8;
 }
 
+.attendance-import-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(340px, 1fr) auto;
+  padding: 18px;
+}
+
+.attendance-import-file-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.attendance-import-label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.attendance-import-file-input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
+.attendance-import-file-control {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #b9c2cf;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 40px;
+  padding: 4px;
+}
+
+.attendance-import-file-control:focus-within {
+  border-color: #23604a;
+  outline: 2px solid #cde7dc;
+}
+
+.attendance-import-file-control button {
+  background: #f8fafc;
+  border: 1px solid #d9dee5;
+  border-radius: 5px;
+  color: #17202a;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 6px 11px;
+  white-space: nowrap;
+}
+
+.attendance-import-file-control button:disabled {
+  color: #94a3b8;
+}
+
+.attendance-import-file-control span {
+  color: #17202a;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendance-import-file-control span[data-empty="true"] {
+  color: #64748b;
+}
+
+.attendance-import-toolbar > button {
+  background: #14543f;
+  border: 1px solid #14543f;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.attendance-import-toolbar > button:disabled {
+  background: #8aa39a;
+  border-color: #8aa39a;
+}
+
+.attendance-import-content {
+  padding: 18px;
+}
+
+.attendance-import-summary {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.attendance-import-summary span,
+.attendance-import-summary strong {
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.attendance-import-summary strong {
+  color: #0f513d;
+}
+
+.attendance-import-table-wrap {
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.attendance-import-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 1040px;
+  width: 100%;
+}
+
+.attendance-import-table th,
+.attendance-import-table td {
+  border-bottom: 1px solid #e2e7ed;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.attendance-import-table th {
+  background: #f8fafc;
+  color: #526173;
+  font-weight: 750;
+}
+
+.attendance-import-table tr[data-status="unknown_employee"],
+.attendance-import-table tr[data-status="error"] {
+  background: #fff7ed;
+}
+
+.attendance-import-table td {
+  color: #334155;
+}
+
 .action-row {
   display: flex;
   flex-wrap: wrap;
@@ -1031,5 +1229,9 @@ h1 {
 
   .schedule-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .attendance-import-toolbar {
+    grid-template-columns: 1fr;
   }
 }

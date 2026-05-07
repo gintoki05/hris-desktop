@@ -19,6 +19,7 @@ pub fn run() {
             commands::employees::deactivate_employee,
             commands::attendance_master::get_attendance_master_data,
             commands::attendance_master::save_attendance_master_data,
+            commands::attendance_import::save_attendance_import_batch,
             commands::work_schedules::get_work_schedule_period,
             commands::work_schedules::save_work_schedule_period
         ])

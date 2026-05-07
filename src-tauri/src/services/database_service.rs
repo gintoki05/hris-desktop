@@ -364,6 +364,38 @@ const MIGRATIONS: &[Migration] = &[
             ON employee_work_schedules(employee_id, work_date);
     ",
     },
+    Migration {
+        id: "202605070004_attendance_import_audit_rows",
+        sql: "
+        ALTER TABLE attendance_entries ADD COLUMN clock_in TEXT;
+        ALTER TABLE attendance_entries ADD COLUMN clock_out TEXT;
+
+        CREATE TABLE IF NOT EXISTS attendance_import_rows (
+            id TEXT PRIMARY KEY,
+            import_batch_id TEXT NOT NULL,
+            source_row_number INTEGER NOT NULL,
+            employee_id TEXT,
+            employee_nik TEXT NOT NULL DEFAULT '',
+            employee_name TEXT NOT NULL DEFAULT '',
+            work_date TEXT NOT NULL,
+            clock_in TEXT,
+            clock_out TEXT,
+            raw_payload_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('valid', 'error', 'unknown_employee')),
+            error_message TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (import_batch_id) REFERENCES attendance_import_batches(id),
+            FOREIGN KEY (employee_id) REFERENCES employees(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_attendance_import_rows_batch
+            ON attendance_import_rows(import_batch_id);
+        CREATE INDEX IF NOT EXISTS idx_attendance_entries_employee_date
+            ON attendance_entries(employee_id, work_date);
+        CREATE INDEX IF NOT EXISTS idx_attendance_entries_import_batch
+            ON attendance_entries(import_batch_id);
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {
