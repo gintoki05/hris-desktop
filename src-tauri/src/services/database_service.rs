@@ -324,6 +324,46 @@ const MIGRATIONS: &[Migration] = &[
         CREATE INDEX IF NOT EXISTS idx_overtime_rules_active ON overtime_rules(is_active);
     ",
     },
+    Migration {
+        id: "202605070003_employee_work_schedules",
+        sql: "
+        CREATE TABLE IF NOT EXISTS work_schedule_periods (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'locked')),
+            locked_payroll_run_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (locked_payroll_run_id) REFERENCES payroll_runs(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS employee_work_schedules (
+            id TEXT PRIMARY KEY,
+            period_id TEXT NOT NULL,
+            employee_id TEXT NOT NULL,
+            work_date TEXT NOT NULL,
+            shift_id TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            locked_payroll_run_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (period_id) REFERENCES work_schedule_periods(id),
+            FOREIGN KEY (employee_id) REFERENCES employees(id),
+            FOREIGN KEY (shift_id) REFERENCES work_shifts(id),
+            FOREIGN KEY (locked_payroll_run_id) REFERENCES payroll_runs(id),
+            UNIQUE (period_id, employee_id, work_date)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_work_schedule_period_dates
+            ON work_schedule_periods(start_date, end_date);
+        CREATE INDEX IF NOT EXISTS idx_employee_work_schedules_period
+            ON employee_work_schedules(period_id);
+        CREATE INDEX IF NOT EXISTS idx_employee_work_schedules_employee_date
+            ON employee_work_schedules(employee_id, work_date);
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {

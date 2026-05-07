@@ -823,6 +823,122 @@ h1 {
   width: 16px;
 }
 
+.schedule-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) 150px 150px auto;
+  padding: 18px 18px 0;
+}
+
+.schedule-toolbar label {
+  color: #334155;
+  display: grid;
+  font-size: 13px;
+  font-weight: 650;
+  gap: 7px;
+}
+
+.schedule-toolbar input,
+.schedule-table input,
+.schedule-table select {
+  background: #ffffff;
+  border: 1px solid #b9c2cf;
+  border-radius: 6px;
+  color: #17202a;
+  min-height: 36px;
+  padding: 7px 9px;
+  width: 100%;
+}
+
+.schedule-toolbar input:focus,
+.schedule-table input:focus,
+.schedule-table select:focus {
+  border-color: #23604a;
+  outline: 2px solid #cde7dc;
+}
+
+.schedule-toolbar input:disabled,
+.schedule-table input:disabled,
+.schedule-table select:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.schedule-toolbar button,
+.schedule-table button {
+  background: #ffffff;
+  border: 1px solid #b9c2cf;
+  border-radius: 6px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+.schedule-toolbar button:disabled,
+.schedule-table button:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.schedule-content {
+  padding: 18px;
+}
+
+.schedule-table-wrap {
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.schedule-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 980px;
+  width: 100%;
+}
+
+.schedule-table th,
+.schedule-table td {
+  border-bottom: 1px solid #e2e7ed;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.schedule-table th {
+  background: #f8fafc;
+  color: #526173;
+  font-weight: 750;
+}
+
+.schedule-shift-cell {
+  display: grid;
+  gap: 5px;
+}
+
+.schedule-shift-cell span {
+  color: #627084;
+  display: block;
+  font-size: 12px;
+  line-height: 1.2;
+  padding-left: 2px;
+}
+
+.schedule-type-text {
+  align-items: center;
+  color: #334155;
+  display: flex;
+  min-height: 36px;
+}
+
+.schedule-table input::placeholder {
+  color: #94a3b8;
+}
+
 .action-row {
   display: flex;
   flex-wrap: wrap;
@@ -910,6 +1026,10 @@ h1 {
   .master-row-shift,
   .master-row-attendance,
   .master-row-overtime {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

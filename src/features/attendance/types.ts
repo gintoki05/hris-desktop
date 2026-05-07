@@ -59,3 +59,42 @@ export type AttendanceMasterActor = {
   displayName: string;
   role: string;
 };
+
+export type WorkScheduleEntry = {
+  id: string;
+  periodId: string;
+  employeeId: string;
+  workDate: string;
+  shiftId: string;
+  notes: string;
+  isLocked: boolean;
+  updatedAt: string;
+};
+
+export type WorkScheduleEntryInput = {
+  id?: string;
+  employeeId: string;
+  workDate: string;
+  shiftId: string;
+  notes: string;
+};
+
+export type WorkSchedulePeriod = {
+  id: string;
+  label: string;
+  startDate: string;
+  endDate: string;
+  status: "draft" | "locked";
+  isLocked: boolean;
+  entries: WorkScheduleEntry[];
+};
+
+export type WorkSchedulePeriodInput = {
+  id?: string;
+  label: string;
+  startDate: string;
+  endDate: string;
+  entries: WorkScheduleEntryInput[];
+};
+
+export type WorkScheduleActor = AttendanceMasterActor;
