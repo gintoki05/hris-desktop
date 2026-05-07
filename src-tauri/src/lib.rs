@@ -16,7 +16,9 @@ pub fn run() {
             commands::employees::list_employees,
             commands::employees::create_employee,
             commands::employees::update_employee,
-            commands::employees::deactivate_employee
+            commands::employees::deactivate_employee,
+            commands::attendance_master::get_attendance_master_data,
+            commands::attendance_master::save_attendance_master_data
         ])
         .run(tauri::generate_context!());
 

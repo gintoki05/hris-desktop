@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { AdminLayout } from "./components/layout/AdminLayout";
+import { AttendanceMasterPanel } from "./features/attendance/components/AttendanceMasterPanel";
 import { LoginPanel } from "./features/auth/components/LoginPanel";
 import { useAuthSession } from "./features/auth/hooks/useAuthSession";
 import type { AuthPermission } from "./features/auth/types";
@@ -122,6 +123,11 @@ function App() {
       />
 
       <EmployeeMasterPanel
+        canEdit={auth.can("master-data:manage")}
+        session={auth.session}
+      />
+
+      <AttendanceMasterPanel
         canEdit={auth.can("master-data:manage")}
         session={auth.session}
       />
