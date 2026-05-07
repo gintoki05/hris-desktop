@@ -232,6 +232,23 @@ const MIGRATIONS: &[Migration] = &[
         );
     ",
     },
+    Migration {
+        id: "202605070001_employee_master_fields",
+        sql: "
+        ALTER TABLE employees ADD COLUMN hire_date TEXT NOT NULL DEFAULT '';
+        ALTER TABLE employees ADD COLUMN marital_status TEXT NOT NULL DEFAULT 'single';
+        ALTER TABLE employees ADD COLUMN dependents INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE employees ADD COLUMN department TEXT NOT NULL DEFAULT '';
+        ALTER TABLE employees ADD COLUMN salary_amount INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE employees ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash';
+        ALTER TABLE employees ADD COLUMN pph21_enabled INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE employees ADD COLUMN work_schedule TEXT NOT NULL DEFAULT 'regular';
+
+        CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status);
+        CREATE INDEX IF NOT EXISTS idx_employees_name ON employees(name);
+        CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import { getMasterSettings, updateMasterSettings } from "../services/master-settings.service";
 import type { MasterSettings, PayrollPaydayType, PayrollWeekday } from "../types";
@@ -350,7 +351,7 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
                 <div className="audit-row" key={event.id}>
                   <strong>{event.actorDisplayName}</strong>
                   <span>{event.changeSummary}</span>
-                  <time>{formatAuditTime(event.createdAt)}</time>
+                  <time>{formatLocalDateTimeFromUtc(event.createdAt)}</time>
                 </div>
               ))
             ) : (
@@ -379,29 +380,4 @@ function settingsChanged(current: MasterSettings | null, draft: MasterSettings):
 
   return JSON.stringify(current.company) !== JSON.stringify(draft.company)
     || JSON.stringify(current.payroll) !== JSON.stringify(draft.payroll);
-}
-
-function formatAuditTime(value: string): string {
-  const date = new Date(toUtcTimestamp(value));
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function toUtcTimestamp(value: string): string {
-  if (value.endsWith("Z") || value.includes("+")) {
-    return value;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
-    return `${value.replace(" ", "T")}Z`;
-  }
-
-  return value;
 }
