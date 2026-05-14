@@ -253,6 +253,8 @@ Payroll and HR business rules must be implemented in TypeScript services by defa
 
 Use shadcn/ui with Tailwind CSS for the desktop admin interface.
 
+For new or touched UI work, use shadcn/ui components by default instead of adding new ad hoc custom CSS controls. Prefer existing components in `src/components/ui` and add missing shadcn components when the current task needs them. Keep feature-specific layout CSS small and only for composition that shadcn components do not cover.
+
 If shadcn/ui is not yet installed, agents may implement the manual shadcn/ui setup when the user asks for it:
 
 - Install only the dependencies required for Tailwind CSS, shadcn/ui, and the specific components being added.
@@ -260,6 +262,7 @@ If shadcn/ui is not yet installed, agents may implement the manual shadcn/ui set
 - Prefer Vite/React-compatible setup; do not add Next.js or React Server Components.
 - Migrate UI incrementally, one screen or component group at a time.
 - Keep existing custom CSS working during transition; remove custom CSS only when the replacement is verified.
+- When editing an existing screen, migrate the touched controls toward shadcn/ui incrementally instead of mixing another custom button/input/dialog pattern into the same area.
 
 Design for clinic admin workflows:
 

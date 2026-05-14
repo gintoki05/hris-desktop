@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
 import { PaginationControls } from "../../../components/shared/PaginationControls";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
 import type { AuthSession } from "../../auth/types";
 import { ATTENDANCE_CODE_CATEGORY_OPTIONS, OVERTIME_APPLIES_TO_OPTIONS } from "../constants";
 import {
@@ -538,24 +547,21 @@ function AddMasterModal({ disabled, draft, onClose, onConfirm, onUpdate }: AddMa
   const title = modalTitleFor(draft.kind);
 
   return (
-    <div
-      className="master-modal-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) {
           onClose();
         }
       }}
     >
-      <div aria-labelledby="master-modal-title" aria-modal="true" className="master-modal" role="dialog">
-        <div className="master-modal-header">
-          <div>
-            <h3 id="master-modal-title">{title}</h3>
-            <p>Isi data baru, lalu tambahkan ke draft. Klik simpan di section untuk menyimpan ke database lokal.</p>
-          </div>
-          <button disabled={disabled} onClick={onClose} type="button">
-            Tutup
-          </button>
-        </div>
+      <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
+        <DialogHeader className="border-b bg-muted/40 p-4">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Isi data baru, lalu tambahkan ke draft. Klik simpan di section untuk menyimpan ke database lokal.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="master-modal-content">
           {draft.kind === "shift" ? (
@@ -569,16 +575,16 @@ function AddMasterModal({ disabled, draft, onClose, onConfirm, onUpdate }: AddMa
           ) : null}
         </div>
 
-        <div className="master-modal-actions">
-          <button disabled={disabled} onClick={onClose} type="button">
+        <DialogFooter className="px-4">
+          <Button disabled={disabled} onClick={onClose} type="button" variant="outline">
             Batal
-          </button>
-          <button disabled={disabled} onClick={onConfirm} type="button">
+          </Button>
+          <Button disabled={disabled} onClick={onConfirm} type="button">
             Tambahkan ke Draft
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

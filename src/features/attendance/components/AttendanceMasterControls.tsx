@@ -1,4 +1,14 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { Button } from "../../../components/ui/button";
+import { Checkbox } from "../../../components/ui/checkbox";
+import { Input } from "../../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
 
 type MasterSectionProps = {
   addDisabled?: boolean;
@@ -37,13 +47,13 @@ export function MasterSection({
         {canEdit ? (
           <div className="master-section-actions">
             {onSave ? (
-              <button disabled={saveDisabled} onClick={onSave} type="button">
+              <Button disabled={saveDisabled} onClick={onSave} size="sm" type="button">
                 {saveLabel}
-              </button>
+              </Button>
             ) : null}
-            <button disabled={addDisabled} onClick={onAdd} type="button">
+            <Button disabled={addDisabled} onClick={onAdd} size="sm" type="button" variant="outline">
               {actionLabel}
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -65,7 +75,7 @@ export function TextInput({ disabled, label, onChange, type = "text", value }: T
   return (
     <label>
       {label}
-      <input disabled={disabled} onChange={(event) => onChange(event.target.value)} type={type} value={value} />
+      <Input disabled={disabled} onChange={(event) => onChange(event.target.value)} type={type} value={value} />
     </label>
   );
 }
@@ -82,7 +92,7 @@ export function NumberInput({ disabled, label, onChange, step = "1", value }: Nu
   return (
     <label>
       {label}
-      <input
+      <Input
         disabled={disabled}
         min={0}
         onChange={(event) => onChange(readNumber(event.target.value, 0))}
@@ -106,13 +116,18 @@ export function SelectInput({ disabled, label, onChange, options, value }: Selec
   return (
     <label>
       {label}
-      <select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <Select disabled={disabled} onValueChange={onChange} value={value}>
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </label>
   );
 }
@@ -125,13 +140,15 @@ type BooleanInputProps = {
 };
 
 export function BooleanInput({ checked, disabled, label, onChange }: BooleanInputProps) {
+  const id = useId();
+
   return (
-    <label className="inline-check">
-      <input
+    <label className="inline-check" htmlFor={id}>
+      <Checkbox
         checked={checked}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        type="checkbox"
+        id={id}
+        onCheckedChange={(value) => onChange(value === true)}
       />
       {label}
     </label>
