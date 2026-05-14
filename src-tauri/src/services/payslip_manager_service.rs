@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -218,11 +219,12 @@ const DEDUCTION_COMPONENT_NAMES: [&str; 6] = [
 pub fn list_payslip_periods(app: &AppHandle) -> Result<Vec<PayslipPeriod>, AppError> {
     database_service::initialize_local_database(app)?;
     let connection = database_service::open_local_connection(app)?;
+    sync_finalized_payroll_runs(&connection)?;
     let mut statement = connection.prepare(
         "
         SELECT id, label, start_date, end_date, status, created_at, updated_at
         FROM payslip_periods
-        ORDER BY start_date DESC, created_at DESC
+        ORDER BY updated_at DESC, start_date DESC, end_date DESC, created_at DESC
         ",
     )?;
 
@@ -461,10 +463,6 @@ pub fn generate_payslip_pdfs(
     let period_id = input.period_id.trim().to_string();
     ensure_period_exists(&connection, &period_id)?;
 
-    let company = get_company_snapshot(&connection)?;
-    let payslip_directory = resolve_payslip_directory(app)?.join(sanitize_file_name(&period_id));
-    fs::create_dir_all(&payslip_directory)?;
-
     let snapshots = list_payslip_snapshots(app, &period_id)?;
     if snapshots.is_empty() {
         return Err(AppError::Database(
@@ -472,11 +470,23 @@ pub fn generate_payslip_pdfs(
         ));
     }
 
+    let company = get_company_snapshot(&connection)?;
+    validate_company_snapshot(&company)?;
+
+    let mut validated_snapshots = Vec::new();
+    for snapshot in snapshots {
+        let payslip = parse_imported_snapshot(&snapshot.snapshot_json)?;
+        validate_imported_payslip_snapshot(&payslip, Some(snapshot.net_pay), Some(&company))?;
+        validated_snapshots.push((snapshot, payslip));
+    }
+
+    let payslip_directory = resolve_payslip_directory(app)?.join(sanitize_file_name(&period_id));
+    fs::create_dir_all(&payslip_directory)?;
+
     let transaction = connection.transaction()?;
     let now = utc_now_string(&transaction)?;
 
-    for snapshot in snapshots {
-        let payslip = parse_imported_snapshot(&snapshot.snapshot_json)?;
+    for (snapshot, payslip) in validated_snapshots {
         let pdf_path = payslip_directory.join(format!(
             "{}-{}.pdf",
             sanitize_file_name(&payslip.payroll.period.label),
@@ -720,6 +730,211 @@ where
     Ok(values)
 }
 
+fn sync_finalized_payroll_runs(connection: &rusqlite::Connection) -> Result<(), AppError> {
+    let mut statement = connection.prepare(
+        "
+        SELECT id, period_label, period_start, period_end, finalized_at, updated_at
+        FROM payroll_runs
+        WHERE status = 'finalized'
+            AND NOT EXISTS (
+                SELECT 1
+                FROM payroll_runs newer
+                WHERE newer.status = 'finalized'
+                    AND newer.period_start = payroll_runs.period_start
+                    AND newer.period_end = payroll_runs.period_end
+                    AND COALESCE(newer.finalized_at, newer.updated_at) > COALESCE(payroll_runs.finalized_at, payroll_runs.updated_at)
+            )
+        ORDER BY finalized_at ASC, updated_at ASC
+        ",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, String>(5)?,
+        ))
+    })?;
+    let mut finalized_runs = Vec::new();
+    for row in rows {
+        finalized_runs.push(row?);
+    }
+    drop(statement);
+
+    for (run_id, label, start_date, end_date, finalized_at, updated_at) in finalized_runs {
+        let batch_id = format!("{run_id}-payroll-final");
+        let already_synced: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM payslip_import_batches WHERE id = ?1)",
+            [&batch_id],
+            |row| row.get(0),
+        )?;
+
+        if already_synced {
+            continue;
+        }
+
+        let now = finalized_at.unwrap_or(updated_at);
+        let period_id = upsert_synced_payslip_period(
+            connection,
+            &run_id,
+            &label,
+            &start_date,
+            &end_date,
+            &now,
+        )?;
+        let snapshots = read_legacy_payroll_snapshots(connection, &run_id)?;
+        if snapshots.is_empty() {
+            continue;
+        }
+
+        connection.execute("DELETE FROM payslip_snapshots WHERE period_id = ?1", [&period_id])?;
+        connection.execute("DELETE FROM payslip_import_batches WHERE period_id = ?1", [&period_id])?;
+        connection.execute(
+            "
+            INSERT INTO payslip_import_batches (
+                id, period_id, source_file_name, imported_by_user_id,
+                imported_by_display_name, imported_by_role, total_rows, valid_rows,
+                error_rows, notes, imported_at
+            )
+            VALUES (?1, ?2, 'Finalisasi payroll manual', 'system', 'Sistem Lokal',
+                'admin_payroll', ?3, ?3, 0, ?4, ?5)
+            ",
+            params![
+                &batch_id,
+                &period_id,
+                snapshots.len() as i64,
+                "Disinkronkan otomatis dari payroll final agar tampil di halaman Slip PDF.",
+                &now,
+            ],
+        )?;
+
+        for snapshot in snapshots {
+            let payslip = parse_imported_snapshot(&snapshot.snapshot_json)?;
+            validate_imported_payslip_snapshot(&payslip, Some(snapshot.net_pay), None)?;
+            connection.execute(
+                "
+                INSERT INTO payslip_snapshots (
+                    id, period_id, import_batch_id, employee_id, employee_nik,
+                    employee_name, employee_position, whatsapp_number, snapshot_json,
+                    net_pay, pdf_file_path, send_status, whatsapp_status, email_status,
+                    status_updated_at, created_at, updated_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+                    CASE WHEN trim(?11) = '' THEN 'not_generated' ELSE 'pdf_ready' END,
+                    CASE WHEN trim(?8) = '' THEN 'missing_number' ELSE 'not_opened' END,
+                    'not_sent', ?12, ?12, ?12)
+                ",
+                params![
+                    &snapshot.id,
+                    &period_id,
+                    &batch_id,
+                    snapshot.employee_id.as_deref(),
+                    &payslip.employee.nik,
+                    &payslip.employee.name,
+                    &payslip.employee.position,
+                    &payslip.employee.whatsapp_number,
+                    &snapshot.snapshot_json,
+                    snapshot.net_pay,
+                    &snapshot.pdf_file_path,
+                    &now,
+                ],
+            )?;
+        }
+
+        connection.execute(
+            "
+            UPDATE payslip_periods
+            SET status = 'pdf_ready', updated_at = ?1
+            WHERE id = ?2
+            ",
+            params![&now, &period_id],
+        )?;
+    }
+
+    Ok(())
+}
+
+struct LegacyPayrollSnapshot {
+    id: String,
+    employee_id: Option<String>,
+    snapshot_json: String,
+    net_pay: i64,
+    pdf_file_path: String,
+}
+
+fn upsert_synced_payslip_period(
+    connection: &rusqlite::Connection,
+    run_id: &str,
+    label: &str,
+    start_date: &str,
+    end_date: &str,
+    now: &str,
+) -> Result<String, AppError> {
+    let existing_period_id: Option<String> = connection
+        .query_row(
+            "
+            SELECT id
+            FROM payslip_periods
+            WHERE start_date = ?1 AND end_date = ?2
+            ",
+            params![start_date.trim(), end_date.trim()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let period_id = existing_period_id.unwrap_or_else(|| run_id.to_string());
+
+    connection.execute(
+        "
+        INSERT INTO payslip_periods (
+            id, label, start_date, end_date, status, created_at, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, 'pdf_ready', ?5, ?5)
+        ON CONFLICT(id) DO UPDATE SET
+            label = excluded.label,
+            start_date = excluded.start_date,
+            end_date = excluded.end_date,
+            status = 'pdf_ready',
+            updated_at = excluded.updated_at
+        ",
+        params![
+            &period_id,
+            label.trim(),
+            start_date.trim(),
+            end_date.trim(),
+            now,
+        ],
+    )?;
+
+    Ok(period_id)
+}
+
+fn read_legacy_payroll_snapshots(
+    connection: &rusqlite::Connection,
+    run_id: &str,
+) -> Result<Vec<LegacyPayrollSnapshot>, AppError> {
+    let mut statement = connection.prepare(
+        "
+        SELECT id, employee_id, snapshot_json, net_pay, pdf_file_path
+        FROM payroll_payslip_snapshots
+        WHERE payroll_run_id = ?1
+        ORDER BY created_at ASC
+        ",
+    )?;
+    let rows = statement.query_map([run_id], |row| {
+        Ok(LegacyPayrollSnapshot {
+            id: row.get(0)?,
+            employee_id: row.get(1)?,
+            snapshot_json: row.get(2)?,
+            net_pay: row.get(3)?,
+            pdf_file_path: row.get(4)?,
+        })
+    })?;
+
+    collect_rows(rows)
+}
+
 fn normalize_period(input: PayslipPeriodInput) -> Result<PayslipPeriodInput, AppError> {
     let period = PayslipPeriodInput {
         id: input.id.map(|id| id.trim().to_string()).filter(|id| !id.is_empty()),
@@ -756,8 +971,8 @@ fn normalize_snapshot(input: PayslipSnapshotInput) -> Result<PayslipSnapshotInpu
         return Err(AppError::Database("gaji bersih snapshot tidak boleh negatif".to_string()));
     }
 
-    let _: serde_json::Value = serde_json::from_str(&snapshot.snapshot_json)
-        .map_err(|_| AppError::Database("snapshot JSON slip tidak valid".to_string()))?;
+    let payslip = parse_imported_snapshot(&snapshot.snapshot_json)?;
+    validate_imported_payslip_snapshot(&payslip, Some(snapshot.net_pay), None)?;
 
     Ok(snapshot)
 }
@@ -905,6 +1120,116 @@ fn get_company_snapshot(connection: &rusqlite::Connection) -> Result<CompanySnap
 fn parse_imported_snapshot(value: &str) -> Result<ImportedPayslipSnapshot, AppError> {
     serde_json::from_str(value)
         .map_err(|_| AppError::Database("snapshot slip tidak bisa dibaca untuk PDF".to_string()))
+}
+
+fn validate_imported_payslip_snapshot(
+    snapshot: &ImportedPayslipSnapshot,
+    stored_net_pay: Option<i64>,
+    company: Option<&CompanySnapshot>,
+) -> Result<(), AppError> {
+    validate_required("NIK karyawan di snapshot slip", &snapshot.employee.nik)?;
+    validate_required("nama karyawan di snapshot slip", &snapshot.employee.name)?;
+    validate_required("jabatan karyawan di snapshot slip", &snapshot.employee.position)?;
+    validate_required("label periode payroll di snapshot slip", &snapshot.payroll.period.label)?;
+    validate_required("tanggal mulai payroll di snapshot slip", &snapshot.payroll.period.start_date)?;
+    validate_required("tanggal selesai payroll di snapshot slip", &snapshot.payroll.period.end_date)?;
+    validate_required("terbilang di snapshot slip", &snapshot.amount_in_words)?;
+
+    if let Some(company) = company {
+        validate_company_snapshot(company)?;
+    }
+
+    validate_components("pendapatan", &snapshot.payroll.income_components, &INCOME_COMPONENT_NAMES)?;
+    validate_components("potongan", &snapshot.payroll.deduction_components, &DEDUCTION_COMPONENT_NAMES)?;
+
+    let gross_pay = sum_component_amounts(&snapshot.payroll.income_components, "pendapatan")?;
+    let total_deductions = sum_component_amounts(&snapshot.payroll.deduction_components, "potongan")?;
+    if snapshot.payroll.gross_pay != gross_pay {
+        return Err(AppError::Database(
+            "jumlah pendapatan snapshot tidak sama dengan total komponen pendapatan".to_string(),
+        ));
+    }
+
+    if snapshot.payroll.total_deductions != total_deductions {
+        return Err(AppError::Database(
+            "jumlah potongan snapshot tidak sama dengan total komponen potongan".to_string(),
+        ));
+    }
+
+    let expected_net_pay = gross_pay
+        .checked_sub(total_deductions)
+        .ok_or_else(|| AppError::Database("gaji bersih snapshot melebihi batas aman".to_string()))?;
+    if snapshot.payroll.net_pay != expected_net_pay {
+        return Err(AppError::Database(
+            "gaji bersih snapshot tidak sama dengan pendapatan dikurangi potongan".to_string(),
+        ));
+    }
+
+    if snapshot.payroll.net_pay < 0 {
+        return Err(AppError::Database("gaji bersih snapshot tidak boleh negatif".to_string()));
+    }
+
+    if let Some(stored_net_pay) = stored_net_pay {
+        if snapshot.payroll.net_pay != stored_net_pay {
+            return Err(AppError::Database(
+                "gaji bersih snapshot tidak sama dengan data tersimpan".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_company_snapshot(company: &CompanySnapshot) -> Result<(), AppError> {
+    validate_required("nama perusahaan", &company.name)?;
+    validate_required("alamat perusahaan", &company.address)?;
+    validate_required("nama bendahara", &company.treasurer_name)?;
+    Ok(())
+}
+
+fn validate_components(
+    group_label: &str,
+    components: &[PayrollComponentSnapshot],
+    required_names: &[&str],
+) -> Result<(), AppError> {
+    let mut seen = HashSet::new();
+    for component in components {
+        validate_required(&format!("nama komponen {group_label}"), &component.name)?;
+        if component.amount < 0 {
+            return Err(AppError::Database(format!(
+                "nominal {} tidak boleh negatif",
+                component.name
+            )));
+        }
+
+        if !seen.insert(component.name.trim().to_string()) {
+            return Err(AppError::Database(format!(
+                "komponen {} muncul lebih dari satu kali",
+                component.name
+            )));
+        }
+    }
+
+    for required_name in required_names {
+        if !components.iter().any(|component| component.name == *required_name) {
+            return Err(AppError::Database(format!(
+                "komponen {required_name} wajib ada di snapshot slip"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn sum_component_amounts(
+    components: &[PayrollComponentSnapshot],
+    group_label: &str,
+) -> Result<i64, AppError> {
+    components.iter().try_fold(0_i64, |total, component| {
+        total.checked_add(component.amount).ok_or_else(|| {
+            AppError::Database(format!("total komponen {group_label} melebihi batas aman"))
+        })
+    })
 }
 
 fn enrich_imported_snapshot_json(value: &str, company: &CompanySnapshot) -> Result<String, AppError> {

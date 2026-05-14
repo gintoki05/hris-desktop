@@ -38,14 +38,16 @@ export function MasterSection({
   title,
 }: MasterSectionProps) {
   return (
-    <div className="master-section">
-      <div className="master-section-header">
-        <div className="master-section-title">
-          <h3>{title}</h3>
-          {typeof itemCount === "number" ? <span>{itemCount} item tersimpan di master</span> : null}
+    <div className="rounded-lg border bg-background p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-1">
+          <h3 className="font-semibold leading-none">{title}</h3>
+          {typeof itemCount === "number" ? (
+            <span className="text-sm text-muted-foreground">{itemCount} item tersimpan di master</span>
+          ) : null}
         </div>
         {canEdit ? (
-          <div className="master-section-actions">
+          <div className="flex flex-wrap gap-2">
             {onSave ? (
               <Button disabled={saveDisabled} onClick={onSave} size="sm" type="button">
                 {saveLabel}
@@ -57,8 +59,8 @@ export function MasterSection({
           </div>
         ) : null}
       </div>
-      {description ? <p className="master-section-description">{description}</p> : null}
-      <div className="master-row-list">{children}</div>
+      {description ? <p className="mt-3 text-sm text-muted-foreground">{description}</p> : null}
+      <div className="mt-4 grid gap-3">{children}</div>
     </div>
   );
 }
@@ -143,7 +145,7 @@ export function BooleanInput({ checked, disabled, label, onChange }: BooleanInpu
   const id = useId();
 
   return (
-    <label className="inline-check" htmlFor={id}>
+    <label className="flex items-center gap-2 text-sm font-medium text-foreground" htmlFor={id}>
       <Checkbox
         checked={checked}
         disabled={disabled}

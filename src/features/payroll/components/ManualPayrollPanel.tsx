@@ -2,9 +2,27 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { Checkbox } from "../../../components/ui/checkbox";
 import { Input } from "../../../components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import {
+  FeaturePanel,
+  PanelBody,
+  PanelNote,
+  StatusBadge,
+} from "../../../components/shared/FeaturePanel";
 import { FormattedAmountInput } from "../../../components/shared/FormattedAmountInput";
 import { formatRupiah } from "../../../lib/formatters/currency";
+import {
+  createCurrentMonthPeriodDefaults,
+  formatDisplayDateText,
+} from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import { listActiveEmployees } from "../../employees/services/employee.service";
 import type { Employee } from "../../employees/types";
@@ -31,11 +49,14 @@ type PayrollRowDraft = {
 
 type PayrollPeriodStatus = "new" | "draft" | "finalized";
 
+const LAST_PAYROLL_PERIOD_STORAGE_KEY = "hris_last_payroll_period";
+
 export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps) {
+  const initialPeriod = useMemo(() => readLastPayrollPeriod(), []);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [periodLabel, setPeriodLabel] = useState(defaultPeriodLabel());
-  const [startDate, setStartDate] = useState(defaultPeriodStart());
-  const [endDate, setEndDate] = useState(defaultPeriodEnd());
+  const [periodLabel, setPeriodLabel] = useState(initialPeriod.label);
+  const [startDate, setStartDate] = useState(initialPeriod.startDate);
+  const [endDate, setEndDate] = useState(initialPeriod.endDate);
   const [rows, setRows] = useState<Record<string, PayrollRowDraft>>({});
   const [payrollRunId, setPayrollRunId] = useState<string | null>(null);
   const [payrollStatus, setPayrollStatus] = useState<PayrollPeriodStatus>("new");
@@ -75,9 +96,21 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
   }, []);
 
   useEffect(() => {
+    saveLastPayrollPeriod({
+      label: periodLabel,
+      startDate,
+      endDate,
+    });
+  }, [endDate, periodLabel, startDate]);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function loadPayrollPeriod() {
+      if (isLoading) {
+        return;
+      }
+
       try {
         const query = {
           periodLabel,
@@ -107,13 +140,14 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
         setRows((current) => applyDraftRows(initializeRows(employees, current), payroll.items));
         setSuccessMessage(
           isFinalized
-            ? `Payroll final ${payroll.periodLabel} dimuat dari snapshot slip.`
-            : `Draft payroll ${payroll.periodLabel} dimuat.`,
+            ? `Payroll final ${formatDisplayDateText(payroll.periodLabel)} dimuat dari snapshot slip.`
+            : `Draft payroll ${formatDisplayDateText(payroll.periodLabel)} dimuat.`,
         );
-      } catch {
+      } catch (error: unknown) {
         if (isMounted) {
           setPayrollRunId(null);
           setPayrollStatus("new");
+          setErrorMessage(error instanceof Error ? error.message : "Draft payroll gagal dibaca.");
         }
       }
     }
@@ -123,7 +157,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
     return () => {
       isMounted = false;
     };
-  }, [employees, endDate, periodLabel, startDate]);
+  }, [employees, endDate, isLoading, periodLabel, startDate]);
 
   const canEditPayroll = canEdit && payrollStatus !== "finalized";
 
@@ -216,7 +250,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
         },
       });
 
-      setSuccessMessage(`Payroll ${run.periodLabel} final untuk ${run.employeeCount} karyawan.`);
+      setSuccessMessage(`Payroll ${formatDisplayDateText(run.periodLabel)} final untuk ${run.employeeCount} karyawan.`);
       setPayrollRunId(run.id);
       setPayrollStatus("finalized");
     } catch (error: unknown) {
@@ -265,7 +299,8 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
 
       setPayrollRunId(draft.payrollRunId);
       setPayrollStatus("draft");
-      setSuccessMessage(`Draft payroll ${draft.periodLabel} tersimpan.`);
+      setRows((current) => applyDraftRows(initializeRows(employees, current), draft.items));
+      setSuccessMessage(`Draft payroll ${formatDisplayDateText(draft.periodLabel)} tersimpan.`);
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Draft payroll gagal disimpan.");
     } finally {
@@ -274,115 +309,119 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
   }
 
   return (
-    <section className="panel" aria-label="Finalisasi payroll manual">
-      <div className="panel-header">
-        <h2>Payroll Manual</h2>
-        <span className="status-pill">{canEditPayroll ? "Finalisasi batch" : "Readonly"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Finalisasi payroll manual"
+      badge={<StatusBadge>{canEditPayroll ? "Finalisasi batch" : "Readonly"}</StatusBadge>}
+      title="Payroll Manual"
+    >
+      <PanelBody>
+        {!canEdit ? <PanelNote>Role saat ini hanya bisa melihat payroll.</PanelNote> : null}
+        {payrollStatus === "finalized" ? (
+          <PanelNote tone="warning">
+            Payroll periode ini sudah final. Data ditampilkan readonly dari snapshot slip.
+          </PanelNote>
+        ) : null}
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {!canEdit ? <p className="readonly-note">Role saat ini hanya bisa melihat payroll.</p> : null}
-      {payrollStatus === "finalized" ? (
-        <p className="readonly-note">Payroll periode ini sudah final. Data ditampilkan readonly dari snapshot slip.</p>
-      ) : null}
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
+        <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.4fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_auto_auto] md:items-end">
+          <label>
+            Label periode
+            <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} />
+          </label>
+          <label>
+            Tanggal mulai
+            <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </label>
+          <label>
+            Tanggal selesai
+            <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </label>
+          <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleSaveDraft()} type="button" variant="outline">
+            {isSaving ? "Menyimpan..." : "Simpan Draft"}
+          </Button>
+          <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleFinalize()} type="button">
+            {isSaving ? "Finalisasi..." : "Finalisasi Payroll"}
+          </Button>
+        </div>
 
-      <div className="payroll-toolbar">
-        <label>
-          Label periode
-          <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} />
-        </label>
-        <label>
-          Tanggal mulai
-          <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-        </label>
-        <label>
-          Tanggal selesai
-          <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-        </label>
-        <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleSaveDraft()} type="button" variant="outline">
-          {isSaving ? "Menyimpan..." : "Simpan Draft"}
-        </Button>
-        <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleFinalize()} type="button">
-          {isSaving ? "Finalisasi..." : "Finalisasi Payroll"}
-        </Button>
-      </div>
+        <div className="payroll-summary">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Checkbox
+              checked={allEmployeesSelected}
+              disabled={!canEditPayroll || isSaving || employees.length === 0}
+              onCheckedChange={(checked) => updateAllSelected(checked === true)}
+            />
+            Pilih semua karyawan
+          </label>
+          <span>Karyawan dipilih: <strong>{selectedCount}</strong></span>
+          <span>Total gaji bersih: <strong>{formatRupiah(totalNetPay)}</strong></span>
+          <span>Status: <strong>{getPayrollStatusLabel(payrollStatus, payrollRunId)}</strong></span>
+        </div>
 
-      <div className="payroll-summary">
-        <label className="inline-check payroll-select-all">
-          <Checkbox
-            checked={allEmployeesSelected}
-            disabled={!canEditPayroll || isSaving || employees.length === 0}
-            onCheckedChange={(checked) => updateAllSelected(checked === true)}
-          />
-          Pilih semua karyawan
-        </label>
-        <span>Karyawan dipilih: <strong>{selectedCount}</strong></span>
-        <span>Total gaji bersih: <strong>{formatRupiah(totalNetPay)}</strong></span>
-        <span>Status: <strong>{getPayrollStatusLabel(payrollStatus, payrollRunId)}</strong></span>
-      </div>
-
-      <div className="payroll-table-wrap">
-        {isLoading ? <p className="status-note">Membaca karyawan aktif...</p> : null}
-        <table className="payroll-table">
-          <thead>
-            <tr>
-              <th>Pilih</th>
-              <th>Karyawan</th>
-              {INCOME_COMPONENT_NAMES.map((component) => <th key={component}>{component}</th>)}
-              {DEDUCTION_COMPONENT_NAMES.map((component) => <th key={component}>{component}</th>)}
-              <th>Gaji Bersih</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div className="overflow-x-auto rounded-lg border bg-background">
+          {isLoading ? <PanelNote>Membaca karyawan aktif...</PanelNote> : null}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16 text-center">Pilih</TableHead>
+              <TableHead>Karyawan</TableHead>
+              {INCOME_COMPONENT_NAMES.map((component) => <TableHead key={component}>{component}</TableHead>)}
+              {DEDUCTION_COMPONENT_NAMES.map((component) => <TableHead key={component}>{component}</TableHead>)}
+              <TableHead>Gaji Bersih</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {employees.map((employee) => {
               const row = rows[employee.id];
               const snapshot = row ? calculateRow(employee.id, row) : null;
 
               return (
-                <tr key={employee.id}>
-                  <td>
+                <TableRow key={employee.id}>
+                  <TableCell className="text-center">
                     <Checkbox
+                      className="mx-auto"
                       checked={row?.selected ?? false}
                       disabled={!canEditPayroll || isSaving}
                       onCheckedChange={(checked) => updateSelected(employee.id, checked === true)}
                     />
-                  </td>
-                  <td>
-                    <strong>{employee.name}</strong>
-                    <span>{employee.nik}</span>
-                  </td>
+                  </TableCell>
+                  <TableCell>
+                    <strong className="block font-semibold">{employee.name}</strong>
+                    <span className="block text-muted-foreground">{employee.nik}</span>
+                  </TableCell>
                   {INCOME_COMPONENT_NAMES.map((component) => (
-                    <td key={component}>
+                    <TableCell key={component}>
                       <FormattedAmountInput
                         disabled={!canEditPayroll || isSaving}
                         onChange={(value) => updateAmount(employee.id, "income", component, value)}
                         value={row?.income[component] ?? 0}
                       />
-                    </td>
+                    </TableCell>
                   ))}
                   {DEDUCTION_COMPONENT_NAMES.map((component) => (
-                    <td key={component}>
+                    <TableCell key={component}>
                       <FormattedAmountInput
                         disabled={!canEditPayroll || isSaving}
                         onChange={(value) => updateAmount(employee.id, "deductions", component, value)}
                         value={row?.deductions[component] ?? 0}
                       />
-                    </td>
+                    </TableCell>
                   ))}
-                  <td>{formatRupiah(snapshot?.netPay ?? 0)}</td>
-                </tr>
+                  <TableCell>{formatRupiah(snapshot?.netPay ?? 0)}</TableCell>
+                </TableRow>
               );
             })}
             {!isLoading && employees.length === 0 ? (
-              <tr>
-                <td colSpan={15}>Belum ada karyawan aktif untuk payroll.</td>
-              </tr>
+              <TableRow>
+                <TableCell colSpan={15}>Belum ada karyawan aktif untuk payroll.</TableCell>
+              </TableRow>
             ) : null}
-          </tbody>
-        </table>
-      </div>
-    </section>
+          </TableBody>
+        </Table>
+        </div>
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 
@@ -493,23 +532,46 @@ function toComponents(values: Record<string, number>): PayrollComponentAmount[] 
   }));
 }
 
-function defaultPeriodLabel(): string {
-  return new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+function readLastPayrollPeriod(): {
+  label: string;
+  startDate: string;
+  endDate: string;
+} {
+  const fallback = createCurrentMonthPeriodDefaults("Payroll");
+
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(LAST_PAYROLL_PERIOD_STORAGE_KEY);
+    if (!rawValue) {
+      return fallback;
+    }
+
+    const parsedValue = JSON.parse(rawValue) as Partial<typeof fallback>;
+    if (!parsedValue.label || !parsedValue.startDate || !parsedValue.endDate) {
+      return fallback;
+    }
+
+    return {
+      label: parsedValue.label,
+      startDate: parsedValue.startDate,
+      endDate: parsedValue.endDate,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
-function defaultPeriodStart(): string {
-  const now = new Date();
-  return formatDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1));
-}
+function saveLastPayrollPeriod(period: {
+  label: string;
+  startDate: string;
+  endDate: string;
+}): void {
+  if (typeof window === "undefined") {
+    return;
+  }
 
-function defaultPeriodEnd(): string {
-  const now = new Date();
-  return formatDateInputValue(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-}
-
-function formatDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  window.sessionStorage.setItem(LAST_PAYROLL_PERIOD_STORAGE_KEY, JSON.stringify(period));
 }

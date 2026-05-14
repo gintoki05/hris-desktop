@@ -1,11 +1,28 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import {
+  FeaturePanel,
+  PanelBody,
+  PanelNote,
+  StatusBadge,
+} from "../../../components/shared/FeaturePanel";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import type { AuthSession } from "../../auth/types";
 import { listActiveEmployees } from "../../employees/services/employee.service";
 import {
   previewFingerprintWorkbook,
   saveAttendanceImportBatch,
 } from "../services/attendance-import.service";
+import { formatDisplayDate, formatDisplayDateRange } from "../../../lib/formatters/date-time";
 import type {
   AttendanceImportActor,
   AttendanceImportPreview,
@@ -86,100 +103,100 @@ export function AttendanceImportPanel({ canEdit, session }: AttendanceImportPane
   }
 
   return (
-    <section className="panel" aria-label="Import absensi fingerprint">
-      <div className="panel-header">
-        <h2>Import Absensi Fingerprint</h2>
-        <span className="status-pill">{canEdit ? "Admin bisa import" : "Readonly"}</span>
-      </div>
-
-      <div className="attendance-import-toolbar">
-        <div className="attendance-import-file-field">
-          <span className="attendance-import-label">File Excel Fingerprint</span>
-          <input
-            accept=".xls,.xlsx,.xlsm"
-            className="attendance-import-file-input"
-            disabled={fileInputDisabled}
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            type="file"
-          />
-          <div className="attendance-import-file-control">
-            <button
+    <FeaturePanel
+      aria-label="Import absensi fingerprint"
+      badge={<StatusBadge>{canEdit ? "Admin bisa import" : "Readonly"}</StatusBadge>}
+      title="Import Absensi Fingerprint"
+    >
+      <PanelBody>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="attendance-import-file-field">
+            <span className="attendance-import-label">File Excel Fingerprint</span>
+            <Input
+              accept=".xls,.xlsx,.xlsm"
+              className="attendance-import-file-input"
               disabled={fileInputDisabled}
-              onClick={() => fileInputRef.current?.click()}
-              type="button"
-            >
-              {isReading ? "Membaca..." : "Pilih File"}
-            </button>
-            <span data-empty={!preview}>{selectedFileName}</span>
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              type="file"
+            />
+            <div className="attendance-import-file-control">
+              <Button
+                disabled={fileInputDisabled}
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+                variant="outline"
+              >
+                {isReading ? "Membaca..." : "Pilih File"}
+              </Button>
+              <span data-empty={!preview}>{selectedFileName}</span>
+            </div>
           </div>
+          <Button disabled={!canSave} onClick={handleSave} type="button">
+            {isSaving ? "Menyimpan..." : "Simpan Import"}
+          </Button>
         </div>
-        <button disabled={!canSave} onClick={handleSave} type="button">
-          {isSaving ? "Menyimpan..." : "Simpan Import"}
-        </button>
-      </div>
 
-      {!canEdit ? (
-        <p className="readonly-note">Role saat ini hanya bisa melihat preview absensi.</p>
-      ) : null}
-      {isReading ? <p className="status-note">Membaca workbook lokal...</p> : null}
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
+        {!canEdit ? <PanelNote>Role saat ini hanya bisa melihat preview absensi.</PanelNote> : null}
+        {isReading ? <PanelNote>Membaca workbook lokal...</PanelNote> : null}
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {preview ? (
-        <div className="attendance-import-content">
-          <div className="attendance-import-summary">
-            <span>File: {preview.sourceFileName}</span>
-            <span>Sheet: {preview.sheetName}</span>
-            <span>
-              Periode: {preview.periodStart ?? "-"} s.d. {preview.periodEnd ?? "-"}
-            </span>
-            <strong>
-              {summary.valid} valid, {summary.unknown} unknown, {summary.error} error
-            </strong>
+        {preview ? (
+          <div className="attendance-import-content">
+            <div className="attendance-import-summary">
+              <span>File: {preview.sourceFileName}</span>
+              <span>Sheet: {preview.sheetName}</span>
+              <span>
+                Periode: {formatDisplayDateRange(preview.periodStart, preview.periodEnd)}
+              </span>
+              <strong>
+                {summary.valid} valid, {summary.unknown} unknown, {summary.error} error
+              </strong>
+            </div>
+
+            {summary.invalid > 0 ? (
+              <PanelNote tone="warning">
+                Perbaiki master karyawan atau file import dulu. Batch belum bisa disimpan selama masih ada baris error.
+              </PanelNote>
+            ) : null}
+
+            <div className="overflow-x-auto rounded-lg border bg-background">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Row</TableHead>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Nama File</TableHead>
+                    <TableHead>Karyawan Match</TableHead>
+                    <TableHead>Masuk</TableHead>
+                    <TableHead>Pulang</TableHead>
+                    <TableHead>Raw</TableHead>
+                    <TableHead>Catatan</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.rows.map((row, index) => (
+                    <TableRow data-status={row.status} key={`${row.rowNumber}-${row.workDate}-${index}`}>
+                      <TableCell>{formatStatus(row.status)}</TableCell>
+                      <TableCell>{row.rowNumber}</TableCell>
+                      <TableCell>{formatDisplayDate(row.workDate)}</TableCell>
+                      <TableCell>{row.employeeName}</TableCell>
+                      <TableCell>{row.matchedEmployeeName || "-"}</TableCell>
+                      <TableCell>{row.clockIn ?? "-"}</TableCell>
+                      <TableCell>{row.clockOut ?? "-"}</TableCell>
+                      <TableCell>{row.rawValue}</TableCell>
+                      <TableCell>{row.errorMessage || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-
-          {summary.invalid > 0 ? (
-            <p className="readonly-note">
-              Perbaiki master karyawan atau file import dulu. Batch belum bisa disimpan selama masih ada baris error.
-            </p>
-          ) : null}
-
-          <div className="attendance-import-table-wrap">
-            <table className="attendance-import-table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Row</th>
-                  <th>Tanggal</th>
-                  <th>Nama File</th>
-                  <th>Karyawan Match</th>
-                  <th>Masuk</th>
-                  <th>Pulang</th>
-                  <th>Raw</th>
-                  <th>Catatan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.rows.map((row, index) => (
-                  <tr data-status={row.status} key={`${row.rowNumber}-${row.workDate}-${index}`}>
-                    <td>{formatStatus(row.status)}</td>
-                    <td>{row.rowNumber}</td>
-                    <td>{row.workDate}</td>
-                    <td>{row.employeeName}</td>
-                    <td>{row.matchedEmployeeName || "-"}</td>
-                    <td>{row.clockIn ?? "-"}</td>
-                    <td>{row.clockOut ?? "-"}</td>
-                    <td>{row.rawValue}</td>
-                    <td>{row.errorMessage || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
-    </section>
+        ) : null}
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 

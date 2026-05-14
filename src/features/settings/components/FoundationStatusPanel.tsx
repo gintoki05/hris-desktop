@@ -1,4 +1,6 @@
 import { AppNotice } from "../../../components/shared/AppNotice";
+import { FeaturePanel, PanelBody, StatusBadge } from "../../../components/shared/FeaturePanel";
+import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
 import type { FoundationStatus } from "../types";
 
 type FoundationStatusPanelProps = {
@@ -11,34 +13,38 @@ export function FoundationStatusPanel({ errorMessage, status }: FoundationStatus
   const migrationCount = status?.database.migrationsApplied ?? 0;
 
   return (
-    <section className="panel" aria-label="Status fondasi aplikasi">
-      <div className="panel-header">
-        <h2>Status Lokal</h2>
-        <span className="status-pill">{isDatabaseReady ? "Siap digunakan" : "Memuat"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Status fondasi aplikasi"
+      badge={<StatusBadge>{isDatabaseReady ? "Siap digunakan" : "Memuat"}</StatusBadge>}
+      title="Status Lokal"
+    >
+      <PanelBody>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatusItem label="Database lokal" value={isDatabaseReady ? "Siap" : "Memuat"} />
+          <StatusItem
+            label="Mode penyimpanan"
+            value={status?.database.journalMode.toLowerCase() === "wal" ? "Aman untuk desktop" : "Standar"}
+          />
+          <StatusItem
+            label="Validasi data"
+            value={status?.database.foreignKeysEnabled ? "Aktif" : "Belum aktif"}
+          />
+          <StatusItem
+            label="Struktur data"
+            value={status ? (migrationCount > 0 ? "Terbaru" : "Awal") : "Memuat"}
+          />
+        </div>
 
-      <div className="status-grid">
-        <StatusItem label="Database lokal" value={isDatabaseReady ? "Siap" : "Memuat"} />
-        <StatusItem
-          label="Mode penyimpanan"
-          value={status?.database.journalMode.toLowerCase() === "wal" ? "Aman untuk desktop" : "Standar"}
-        />
-        <StatusItem
-          label="Validasi data"
-          value={status?.database.foreignKeysEnabled ? "Aktif" : "Belum aktif"}
-        />
-        <StatusItem
-          label="Struktur data"
-          value={status ? (migrationCount > 0 ? "Terbaru" : "Awal") : "Memuat"}
-        />
-      </div>
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
 
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-
-      <p className="status-note">
-        Data disimpan di komputer ini. Backup dan restore tetap memakai safety backup sebelum mengganti data.
-      </p>
-    </section>
+        <Alert>
+          <AlertTitle>Penyimpanan lokal</AlertTitle>
+          <AlertDescription>
+            Data disimpan di komputer ini. Backup dan restore tetap memakai safety backup sebelum mengganti data.
+          </AlertDescription>
+        </Alert>
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 
@@ -49,9 +55,9 @@ type StatusItemProps = {
 
 function StatusItem({ label, value }: StatusItemProps) {
   return (
-    <div className="status-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="rounded-lg border border-border bg-muted/20 p-3">
+      <span className="block text-xs font-medium uppercase text-muted-foreground">{label}</span>
+      <strong className="mt-1 block text-sm font-semibold text-foreground">{value}</strong>
     </div>
   );
 }

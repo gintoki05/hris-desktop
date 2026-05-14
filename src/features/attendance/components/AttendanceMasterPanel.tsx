@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import {
+  FeaturePanel,
+  PanelBody,
+  PanelNote,
+  StatusBadge,
+} from "../../../components/shared/FeaturePanel";
 import { PaginationControls } from "../../../components/shared/PaginationControls";
 import { Button } from "../../../components/ui/button";
 import {
@@ -240,21 +246,21 @@ export function AttendanceMasterPanel({ canEdit, session }: AttendanceMasterPane
     : false;
 
   return (
-    <section className="panel" aria-label="Master shift dan kode absensi">
-      <div className="panel-header">
-        <h2>Master Shift & Absensi</h2>
-        <span className="status-pill">{canEdit ? "Admin bisa edit" : "Readonly"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Master shift dan kode absensi"
+      badge={<StatusBadge>{canEdit ? "Admin bisa edit" : "Readonly"}</StatusBadge>}
+      title="Master Shift & Absensi"
+    >
+      <PanelBody>
+        {isLoading ? <PanelNote>Membaca master absensi lokal...</PanelNote> : null}
+        {!canEdit ? (
+          <PanelNote>Role saat ini hanya bisa melihat master shift dan absensi.</PanelNote>
+        ) : null}
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {isLoading ? <p className="status-note">Membaca master absensi lokal...</p> : null}
-      {!canEdit ? (
-        <p className="readonly-note">Role saat ini hanya bisa melihat master shift dan absensi.</p>
-      ) : null}
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
-
-      {draft ? (
-        <div className="attendance-master-content">
+        {draft ? (
+          <div className="attendance-master-content">
           <MasterSection
             addDisabled={disabled}
             actionLabel="Tambah Shift"
@@ -512,8 +518,9 @@ export function AttendanceMasterPanel({ canEdit, session }: AttendanceMasterPane
             />
           ) : null}
         </div>
-      ) : null}
-    </section>
+        ) : null}
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 
@@ -527,9 +534,16 @@ function RowActionButton({ canRemove, disabled, onRemove }: RowActionButtonProps
   return (
     <div className="master-row-actions">
       {canRemove ? (
-        <button className="master-row-action" disabled={disabled} onClick={onRemove} type="button">
+        <Button
+          className="master-row-action"
+          disabled={disabled}
+          onClick={onRemove}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
           Hapus Baris
-        </button>
+        </Button>
       ) : null}
     </div>
   );

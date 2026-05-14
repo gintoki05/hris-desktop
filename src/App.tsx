@@ -1,6 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  DatabaseBackup,
+  FileSpreadsheet,
+  Settings,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import "./App.css";
 import { AdminLayout, type AdminPage } from "./components/layout/AdminLayout";
+import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { AttendanceImportPanel } from "./features/attendance/components/AttendanceImportPanel";
 import { AttendanceMasterPanel } from "./features/attendance/components/AttendanceMasterPanel";
 import { WorkSchedulePanel } from "./features/attendance/components/WorkSchedulePanel";
@@ -10,7 +29,6 @@ import type { AuthPermission } from "./features/auth/types";
 import { EmployeeMasterPanel } from "./features/employees/components/EmployeeMasterPanel";
 import { OrganizationMasterPanel } from "./features/organization/components/OrganizationMasterPanel";
 import { PayslipManagerPanel } from "./features/payslips/components/PayslipManagerPanel";
-import { PayslipWhatsAppPanel } from "./features/payslips/components/PayslipWhatsAppPanel";
 import { ManualPayrollPanel } from "./features/payroll/components/ManualPayrollPanel";
 import { FoundationStatusPanel } from "./features/settings/components/FoundationStatusPanel";
 import { MasterSettingsPanel } from "./features/settings/components/MasterSettingsPanel";
@@ -88,11 +106,32 @@ function App() {
       label: string;
       permission: AuthPermission;
       targetPage: AdminPage;
+      icon: LucideIcon;
     }> => [
-      { label: "Kelola Master Data", permission: "master-data:manage", targetPage: "master-data" },
-      { label: "Import Absensi", permission: "attendance:manage", targetPage: "attendance" },
-      { label: "Hitung Payroll", permission: "payroll:manage", targetPage: "payroll" },
-      { label: "Buat Backup", permission: "backup:manage", targetPage: "backup" },
+      {
+        icon: Users,
+        label: "Kelola Master Data",
+        permission: "master-data:manage",
+        targetPage: "master-data",
+      },
+      {
+        icon: FileSpreadsheet,
+        label: "Import Absensi",
+        permission: "attendance:manage",
+        targetPage: "attendance",
+      },
+      {
+        icon: Settings,
+        label: "Hitung Payroll",
+        permission: "payroll:manage",
+        targetPage: "payroll",
+      },
+      {
+        icon: DatabaseBackup,
+        label: "Buat Backup",
+        permission: "backup:manage",
+        targetPage: "backup",
+      },
     ],
     [],
   );
@@ -118,7 +157,7 @@ function App() {
       dashboard: "Ringkasan status aplikasi dan akses cepat untuk pekerjaan payroll harian.",
       "master-data": "Kelola data dasar perusahaan, karyawan, shift, kode absensi, dan aturan lembur.",
       payroll: "Hitung payroll dari snapshot absensi dan master payroll yang sudah tervalidasi.",
-      payslips: "Kelola periode slip, snapshot data gaji final, PDF massal, dan status kirim WhatsApp manual.",
+      payslips: "Kelola periode slip, daftar slip karyawan, PDF massal, dan status kirim WhatsApp manual.",
       reports: "Lihat ringkasan payroll dan data manajemen tanpa aksi perubahan.",
     };
 
@@ -145,11 +184,11 @@ function App() {
       onNavigate={setActivePage}
       session={auth.session}
     >
-      <section className="page-header">
+      <section className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <p className="eyebrow">HRIS Payroll Klinik</p>
-          <h1>{pageTitle}</h1>
-          <p className="page-description">{pageDescription}</p>
+          <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">HRIS Payroll Klinik</p>
+          <h1 className="mb-2 text-3xl font-semibold tracking-normal text-foreground">{pageTitle}</h1>
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{pageDescription}</p>
         </div>
       </section>
 
@@ -157,72 +196,78 @@ function App() {
         <>
           <FoundationStatusPanel errorMessage={errorMessage} status={status} />
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Aksi Penting</h2>
-            </div>
-            <div className="action-row" aria-label="Aksi penting">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>Aksi Penting</CardTitle>
+                <CardDescription>Jalur cepat untuk pekerjaan payroll harian.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2" aria-label="Aksi penting">
               {actions.map((action) => (
-                <button
+                <Button
                   disabled={!auth.can(action.permission)}
                   key={action.label}
                   onClick={() => setActivePage(action.targetPage)}
                   type="button"
+                  variant="outline"
                 >
+                  <action.icon aria-hidden="true" />
                   {action.label}
-                </button>
+                  <ArrowRight aria-hidden="true" />
+                </Button>
               ))}
-            </div>
-          </section>
+            </CardContent>
+          </Card>
         </>
       ) : null}
 
       {activePage === "master-data" ? (
-        <>
-          <div className="page-tabs" role="tablist" aria-label="Submenu master data">
+        <Tabs
+          aria-label="Submenu master data"
+          onValueChange={(value) => setActiveMasterDataTab(value as MasterDataTab)}
+          value={activeMasterDataTab}
+        >
+          <TabsList>
             {masterDataTabs.map((tab) => (
-              <button
-                aria-selected={tab.id === activeMasterDataTab}
-                className="page-tab"
+              <TabsTrigger
                 key={tab.id}
-                onClick={() => setActiveMasterDataTab(tab.id)}
-                role="tab"
-                type="button"
+                value={tab.id}
               >
                 {tab.label}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
 
-          {activeMasterDataTab === "settings" ? (
+          <TabsContent value="settings">
             <MasterSettingsPanel
               canEdit={auth.can("master-data:manage")}
               onSettingsSaved={setMasterSettings}
               session={auth.session}
             />
-          ) : null}
+          </TabsContent>
 
-          {activeMasterDataTab === "employees" ? (
+          <TabsContent value="employees">
             <EmployeeMasterPanel
               canEdit={auth.can("master-data:manage")}
               session={auth.session}
             />
-          ) : null}
+          </TabsContent>
 
-          {activeMasterDataTab === "organization-master" ? (
+          <TabsContent value="organization-master">
             <OrganizationMasterPanel
               canEdit={auth.can("master-data:manage")}
               session={auth.session}
             />
-          ) : null}
+          </TabsContent>
 
-          {activeMasterDataTab === "attendance-master" ? (
+          <TabsContent value="attendance-master">
             <AttendanceMasterPanel
               canEdit={auth.can("master-data:manage")}
               session={auth.session}
             />
-          ) : null}
-        </>
+          </TabsContent>
+        </Tabs>
       ) : null}
 
       {activePage === "attendance" ? (
@@ -254,13 +299,10 @@ function App() {
       ) : null}
 
       {activePage === "payslips" ? (
-        <>
-          <PayslipManagerPanel
-            canEdit={auth.can("payroll:manage")}
-            session={auth.session}
-          />
-          <PayslipWhatsAppPanel session={auth.session} />
-        </>
+        <PayslipManagerPanel
+          canEdit={auth.can("payroll:manage")}
+          session={auth.session}
+        />
       ) : null}
 
       {activePage === "backup" ? (
@@ -281,13 +323,20 @@ function PlaceholderPanel({
   title: string;
 }) {
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>{title}</h2>
-        <span className="status-pill">V1 backlog</span>
-      </div>
-      <p className="empty-panel-note">{description}</p>
-    </section>
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        <CardAction>
+          <Badge variant="outline">V1 backlog</Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="text-sm text-muted-foreground">
+        Detail implementasi akan diselesaikan saat scope backlog ini dikerjakan.
+      </CardContent>
+    </Card>
   );
 }
 

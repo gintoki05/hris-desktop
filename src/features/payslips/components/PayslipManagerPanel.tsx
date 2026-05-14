@@ -2,9 +2,31 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import {
+  FeaturePanel,
+  PanelBody,
+  PanelNote,
+  StatusBadge,
+} from "../../../components/shared/FeaturePanel";
 import { FileActionRow } from "../../../components/shared/FileActionRow";
 import { FileNameCell } from "../../../components/shared/FileNameCell";
+import { PaginationControls } from "../../../components/shared/PaginationControls";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import { formatRupiah } from "../../../lib/formatters/currency";
+import {
+  createCurrentMonthPeriodDefaults,
+  formatDisplayDateRange,
+  formatDisplayDateText,
+} from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import { listActiveEmployees } from "../../employees/services/employee.service";
 import {
@@ -70,17 +92,21 @@ const EMAIL_STATUS_LABELS: Record<PayslipManagerSnapshot["emailStatus"], string>
   sent: "Terkirim",
 };
 
+const PERIOD_PAGE_SIZE = 5;
+
 export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialPeriod = useMemo(() => createCurrentMonthPeriodDefaults("Slip Gaji"), []);
   const [periods, setPeriods] = useState<PayslipPeriod[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<PayslipManagerSnapshot[]>([]);
   const [preview, setPreview] = useState<PayslipImportPreview | null>(null);
   const [savedTemplate, setSavedTemplate] = useState<SavedTemplateFile | null>(null);
   const [generatedPdfFolder, setGeneratedPdfFolder] = useState<GeneratedPdfFolder | null>(null);
-  const [periodLabel, setPeriodLabel] = useState(defaultPeriodLabel());
-  const [startDate, setStartDate] = useState(defaultPeriodStart());
-  const [endDate, setEndDate] = useState(defaultPeriodEnd());
+  const [periodLabel, setPeriodLabel] = useState(initialPeriod.label);
+  const [startDate, setStartDate] = useState(initialPeriod.startDate);
+  const [endDate, setEndDate] = useState(initialPeriod.endDate);
+  const [periodPage, setPeriodPage] = useState(1);
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(true);
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
   const [isSavingPeriod, setIsSavingPeriod] = useState(false);
@@ -111,6 +137,17 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     () => periods.find((period) => period.id === selectedPeriodId) ?? null,
     [periods, selectedPeriodId],
   );
+  const paginatedPeriods = useMemo(() => {
+    const startIndex = (periodPage - 1) * PERIOD_PAGE_SIZE;
+    return periods.slice(startIndex, startIndex + PERIOD_PAGE_SIZE);
+  }, [periodPage, periods]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(periods.length / PERIOD_PAGE_SIZE));
+    if (periodPage > totalPages) {
+      setPeriodPage(totalPages);
+    }
+  }, [periodPage, periods.length]);
 
   const summary = useMemo(
     () => ({
@@ -144,6 +181,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     try {
       const nextPeriods = await listPayslipPeriods();
       setPeriods(nextPeriods);
+      setPeriodPage(1);
       setSelectedPeriodId((current) => current ?? nextPeriods[0]?.id ?? null);
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Periode slip gagal dibaca.");
@@ -159,7 +197,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     try {
       setSnapshots(await listPayslipSnapshots(periodId));
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Snapshot slip gagal dibaca.");
+      setErrorMessage(error instanceof Error ? error.message : "Daftar slip karyawan gagal dibaca.");
     } finally {
       setIsLoadingSnapshots(false);
     }
@@ -294,7 +332,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       await refreshPeriods();
       setSelectedPeriodId(selectedPeriod.id);
       setSuccessMessage(
-        `PDF ${selectedPeriod.label} dibuat untuk ${pdfPaths.length} snapshot slip.`,
+        `PDF ${selectedPeriod.label} dibuat untuk ${pdfPaths.length} slip karyawan.`,
       );
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "PDF slip gagal dibuat.");
@@ -477,7 +515,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
         session,
       );
       setSuccessMessage(
-        `Import ${batch.sourceFileName} tersimpan: ${batch.validRows} snapshot slip.`,
+        `Import ${batch.sourceFileName} tersimpan: ${batch.validRows} slip karyawan.`,
       );
       setPreview(null);
       await refreshPeriods();
@@ -490,83 +528,126 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
   }
 
   return (
-    <section className="panel" aria-label="Payslip Manager">
-      <div className="panel-header">
-        <h2>Payslip Manager</h2>
-        <span className="status-pill">Import Excel berikutnya</span>
-      </div>
+    <FeaturePanel
+      aria-label="Periode slip dan daftar slip karyawan"
+      badge={<StatusBadge>Periode aktif</StatusBadge>}
+      title="Slip PDF"
+    >
+      <PanelBody>
+        {!canEdit ? (
+          <PanelNote>Role saat ini hanya bisa melihat periode dan daftar slip karyawan.</PanelNote>
+        ) : null}
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {!canEdit ? (
-        <p className="readonly-note">Role saat ini hanya bisa melihat periode dan snapshot slip.</p>
-      ) : null}
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
-
-      <div className="payslip-manager-toolbar">
-        <label>
-          Label periode
-          <input
-            disabled={!canEdit || isSavingPeriod}
-            onChange={(event) => setPeriodLabel(event.target.value)}
-            value={periodLabel}
-          />
-        </label>
-        <label>
-          Tanggal mulai
-          <input
-            disabled={!canEdit || isSavingPeriod}
-            onChange={(event) => setStartDate(event.target.value)}
-            type="date"
-            value={startDate}
-          />
-        </label>
-        <label>
-          Tanggal selesai
-          <input
-            disabled={!canEdit || isSavingPeriod}
-            onChange={(event) => setEndDate(event.target.value)}
-            type="date"
-            value={endDate}
-          />
-        </label>
-        <button disabled={!canEdit || isSavingPeriod} onClick={handleSavePeriod} type="button">
-          {isSavingPeriod ? "Menyimpan..." : "Simpan Periode"}
-        </button>
-        <button disabled={isLoadingPeriods} onClick={() => void refreshPeriods()} type="button">
-          Refresh
-        </button>
-      </div>
-
-      <div className="payslip-manager-content">
-        <div className="payslip-period-list" aria-label="Daftar periode slip">
-          <div className="master-section-header">
-            <h3>Periode Slip</h3>
-            <span>{periods.length} periode</span>
-          </div>
-          {isLoadingPeriods ? <p className="status-note">Membaca periode slip...</p> : null}
-          {!isLoadingPeriods && periods.length === 0 ? (
-            <p className="empty-panel-note">Belum ada periode slip. Buat periode sebelum import Excel.</p>
-          ) : null}
-          {periods.map((period) => (
-            <button
-              className="payslip-period-item"
-              data-active={period.id === selectedPeriodId}
-              key={period.id}
-              onClick={() => setSelectedPeriodId(period.id)}
-              type="button"
-            >
-              <strong>{period.label}</strong>
-              <span>{period.startDate} s.d. {period.endDate}</span>
-              <em>{PERIOD_STATUS_LABELS[period.status]}</em>
-            </button>
-          ))}
+        <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.4fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_auto_auto] md:items-end">
+          <label>
+            Label periode
+            <Input
+              disabled={!canEdit || isSavingPeriod}
+              onChange={(event) => setPeriodLabel(event.target.value)}
+              value={periodLabel}
+            />
+          </label>
+          <label>
+            Tanggal mulai
+            <Input
+              disabled={!canEdit || isSavingPeriod}
+              onChange={(event) => setStartDate(event.target.value)}
+              type="date"
+              value={startDate}
+            />
+          </label>
+          <label>
+            Tanggal selesai
+            <Input
+              disabled={!canEdit || isSavingPeriod}
+              onChange={(event) => setEndDate(event.target.value)}
+              type="date"
+              value={endDate}
+            />
+          </label>
+          <Button disabled={!canEdit || isSavingPeriod} onClick={handleSavePeriod} type="button">
+            {isSavingPeriod ? "Menyimpan..." : "Simpan Periode"}
+          </Button>
+          <Button disabled={isLoadingPeriods} onClick={() => void refreshPeriods()} type="button" variant="outline">
+            Refresh
+          </Button>
         </div>
 
-        <div className="payslip-snapshot-panel">
-          <div className="payslip-import-toolbar">
+        <div className="payslip-manager-content">
+          <div className="min-w-0 overflow-hidden rounded-lg border bg-background p-4" aria-label="Daftar periode slip">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Periode Slip</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Terbaru diurutkan paling atas.</p>
+              </div>
+              <span className="text-sm text-muted-foreground">{periods.length} periode</span>
+            </div>
+            {isLoadingPeriods ? <PanelNote>Membaca periode slip...</PanelNote> : null}
+            {!isLoadingPeriods && periods.length === 0 ? (
+              <PanelNote>Belum ada periode slip. Buat periode sebelum import Excel.</PanelNote>
+            ) : null}
+            <div className="grid gap-2">
+              {paginatedPeriods.map((period) => {
+                const isSelected = period.id === selectedPeriodId;
+
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={[
+                      "grid min-w-0 w-full gap-1 overflow-hidden rounded-lg border px-3 py-2 text-left transition-colors",
+                      "hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isSelected
+                        ? "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary/20"
+                        : "border-border bg-card text-foreground",
+                    ].join(" ")}
+                    key={period.id}
+                    onClick={() => setSelectedPeriodId(period.id)}
+                    type="button"
+                  >
+                    <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <strong className="min-w-0 truncate text-sm font-semibold">
+                        {formatDisplayDateText(period.label)}
+                      </strong>
+                      <StatusBadge>{PERIOD_STATUS_LABELS[period.status]}</StatusBadge>
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {formatDisplayDateRange(period.startDate, period.endDate)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {periods.length > PERIOD_PAGE_SIZE ? (
+              <div className="mt-3">
+                <PaginationControls
+                  ariaLabel="Pagination periode slip"
+                  currentPage={periodPage}
+                  itemLabel="periode"
+                  onPageChange={setPeriodPage}
+                  pageSize={PERIOD_PAGE_SIZE}
+                  totalItems={periods.length}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="grid gap-4 rounded-lg border bg-background p-4" aria-label="Daftar slip karyawan">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Daftar Slip Karyawan</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Data di sini hanya berasal dari periode slip yang dipilih.
+              </p>
+            </div>
+            <StatusBadge>{selectedPeriod?.label ?? "Pilih periode"}</StatusBadge>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
             <div className="attendance-import-file-field">
               <span className="attendance-import-label">File Excel Slip Gaji</span>
-              <input
+              <Input
                 accept=".xls,.xlsx,.xlsm"
                 className="attendance-import-file-input"
                 disabled={!canEdit || !selectedPeriod || isReadingImport || isSavingImport}
@@ -575,29 +656,31 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                 type="file"
               />
               <div className="attendance-import-file-control">
-                <button
+                <Button
                   disabled={!canEdit || !selectedPeriod || isReadingImport || isSavingImport}
                   onClick={() => fileInputRef.current?.click()}
                   type="button"
+                  variant="outline"
                 >
                   {isReadingImport ? "Membaca..." : "Pilih File"}
-                </button>
+                </Button>
                 <span data-empty={!preview}>{preview?.sourceFileName ?? "Belum ada file dipilih"}</span>
               </div>
             </div>
-            <button
+            <Button
               disabled={!canEdit || !selectedPeriod || isExportingTemplate}
               onClick={handleExportTemplate}
               type="button"
+              variant="outline"
             >
               {isExportingTemplate ? "Membuat..." : "Download Template"}
-            </button>
-            <button disabled={!canSaveImport} onClick={handleSaveImport} type="button">
+            </Button>
+            <Button disabled={!canSaveImport} onClick={handleSaveImport} type="button">
               {isSavingImport ? "Menyimpan..." : "Simpan Import"}
-            </button>
-            <button disabled={!canGeneratePdf} onClick={handleGeneratePdf} type="button">
+            </Button>
+            <Button disabled={!canGeneratePdf} onClick={handleGeneratePdf} type="button">
               {isGeneratingPdf ? "Membuat PDF..." : "Generate PDF"}
-            </button>
+            </Button>
           </div>
 
           {preview ? (
@@ -611,45 +694,45 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
               </div>
 
               {importSummary.error > 0 ? (
-                <p className="readonly-note">
-                  Perbaiki file import dulu. Snapshot belum bisa disimpan selama masih ada baris error.
-                </p>
+                <PanelNote tone="warning">
+                  Perbaiki file import dulu. Slip karyawan belum bisa disimpan selama masih ada baris error.
+                </PanelNote>
               ) : null}
 
-              <div className="attendance-import-table-wrap">
-                <table className="attendance-import-table payslip-import-preview-table">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Row</th>
-                      <th>Karyawan</th>
-                      <th>Match</th>
-                      <th>WhatsApp</th>
-                      <th>Pendapatan</th>
-                      <th>Potongan</th>
-                      <th>Gaji Bersih</th>
-                      <th>Catatan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="overflow-x-auto rounded-lg border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Row</TableHead>
+                      <TableHead>Karyawan</TableHead>
+                      <TableHead>Match</TableHead>
+                      <TableHead>WhatsApp</TableHead>
+                      <TableHead>Pendapatan</TableHead>
+                      <TableHead>Potongan</TableHead>
+                      <TableHead>Gaji Bersih</TableHead>
+                      <TableHead>Catatan</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {preview.rows.map((row) => (
-                      <tr data-status={row.status} key={`${row.rowNumber}-${row.employeeName}`}>
-                        <td>{formatPreviewStatus(row.status)}</td>
-                        <td>{row.rowNumber}</td>
-                        <td>
-                          <strong>{row.employeeName}</strong>
-                          <span>{row.employeeNik || "-"} | {row.employeePosition || "-"}</span>
-                        </td>
-                        <td>{row.matchedEmployeeName || "-"}</td>
-                        <td>{row.whatsappNumber || "-"}</td>
-                        <td>{formatRupiah(row.grossPay)}</td>
-                        <td>{formatRupiah(row.totalDeductions)}</td>
-                        <td>{formatRupiah(row.netPay)}</td>
-                        <td>{row.errorMessage || "-"}</td>
-                      </tr>
+                      <TableRow data-status={row.status} key={`${row.rowNumber}-${row.employeeName}`}>
+                        <TableCell>{formatPreviewStatus(row.status)}</TableCell>
+                        <TableCell>{row.rowNumber}</TableCell>
+                        <TableCell>
+                          <strong className="block font-semibold">{row.employeeName}</strong>
+                          <span className="block text-muted-foreground">{row.employeeNik || "-"} | {row.employeePosition || "-"}</span>
+                        </TableCell>
+                        <TableCell>{row.matchedEmployeeName || "-"}</TableCell>
+                        <TableCell>{row.whatsappNumber || "-"}</TableCell>
+                        <TableCell>{formatRupiah(row.grossPay)}</TableCell>
+                        <TableCell>{formatRupiah(row.totalDeductions)}</TableCell>
+                        <TableCell>{formatRupiah(row.netPay)}</TableCell>
+                        <TableCell>{row.errorMessage || "-"}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </div>
           ) : null}
@@ -672,7 +755,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             />
           ) : null}
 
-          <div className="payslip-queue-summary">
+          <div className="payslip-status-summary">
             <span>Periode: <strong>{selectedPeriod?.label ?? "-"}</strong></span>
             <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
             <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
@@ -680,81 +763,90 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             <span>Belum terkirim via jalur apa pun: <strong>{summary.undelivered}</strong></span>
           </div>
 
-          <div className="payslip-queue-table-wrap">
-            {isLoadingSnapshots ? <p className="status-note">Membaca snapshot slip...</p> : null}
-            <table className="payslip-queue-table payslip-manager-table">
-              <thead>
-                <tr>
-                  <th>Karyawan</th>
-                  <th>WhatsApp</th>
-                  <th>Gaji Bersih</th>
-                  <th>PDF</th>
-                  <th>WA</th>
-                  <th>Email</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="overflow-x-auto rounded-lg border bg-background">
+            {isLoadingSnapshots ? <PanelNote>Membaca daftar slip karyawan...</PanelNote> : null}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Karyawan</TableHead>
+                  <TableHead>WhatsApp</TableHead>
+                  <TableHead>Gaji Bersih</TableHead>
+                  <TableHead>PDF</TableHead>
+                  <TableHead>WA</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {snapshots.map((snapshot) => (
-                  <tr key={snapshot.id} data-status={snapshot.sendStatus}>
-                    <td>
-                      <strong>{snapshot.employeeName}</strong>
-                      <span>{snapshot.employeeNik || "-"} | {snapshot.employeePosition || "-"}</span>
-                    </td>
-                    <td>{snapshot.whatsappNumber ? maskWhatsAppNumber(snapshot.whatsappNumber) : "-"}</td>
-                    <td>{formatRupiah(snapshot.netPay)}</td>
-                    <td><FileNameCell path={snapshot.pdfFilePath} /></td>
-                    <td>
-                      <span className="status-pill">{WHATSAPP_STATUS_LABELS[snapshot.whatsappStatus]}</span>
-                    </td>
-                    <td>
-                      <span className="status-pill">{EMAIL_STATUS_LABELS[snapshot.emailStatus]}</span>
+                  <TableRow key={snapshot.id} data-status={snapshot.sendStatus}>
+                    <TableCell>
+                      <strong className="block font-semibold">{snapshot.employeeName}</strong>
+                      <span className="block text-muted-foreground">{snapshot.employeeNik || "-"} | {snapshot.employeePosition || "-"}</span>
+                    </TableCell>
+                    <TableCell>{snapshot.whatsappNumber ? maskWhatsAppNumber(snapshot.whatsappNumber) : "-"}</TableCell>
+                    <TableCell>{formatRupiah(snapshot.netPay)}</TableCell>
+                    <TableCell><FileNameCell path={snapshot.pdfFilePath} /></TableCell>
+                    <TableCell>
+                      <StatusBadge>{WHATSAPP_STATUS_LABELS[snapshot.whatsappStatus]}</StatusBadge>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge>{EMAIL_STATUS_LABELS[snapshot.emailStatus]}</StatusBadge>
                       {snapshot.emailErrorMessage ? (
                         <span className="delivery-error-note">{snapshot.emailErrorMessage}</span>
                       ) : null}
-                    </td>
-                    <td>
-                      <div className="payslip-queue-actions">
-                        <button
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
                           disabled={updatingSnapshotId === snapshot.id || !snapshot.pdfFilePath.trim()}
                           onClick={() => void handleSendEmail(snapshot)}
+                          size="sm"
                           type="button"
                         >
                           Kirim Email
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={updatingSnapshotId === snapshot.id || !snapshot.pdfFilePath.trim()}
                           onClick={() => void handleOpenPdf(snapshot.pdfFilePath)}
+                          size="sm"
                           type="button"
+                          variant="outline"
                         >
                           Buka PDF
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={updatingSnapshotId === snapshot.id || snapshot.sendStatus === "not_generated"}
                           onClick={() => void handlePrepareWhatsAppSend(snapshot)}
+                          size="sm"
                           type="button"
+                          variant="outline"
                         >
                           Siapkan Kirim
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={updatingSnapshotId === snapshot.id || snapshot.sendStatus === "not_generated"}
                           onClick={() => void handleCopyWhatsAppMessage(snapshot)}
+                          size="sm"
                           type="button"
+                          variant="outline"
                         >
                           Salin
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={updatingSnapshotId === snapshot.id || snapshot.sendStatus === "not_generated"}
                           onClick={() => void updateSnapshotStatus(
                             snapshot,
                             "sent",
                             `WA ${snapshot.employeeName} ditandai terkirim manual.`,
                           )}
+                          size="sm"
                           type="button"
+                          variant="secondary"
                         >
                           Terkirim
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={updatingSnapshotId === snapshot.id || snapshot.sendStatus === "not_generated"}
                           onClick={() => void updateSnapshotStatus(
                             snapshot,
@@ -763,30 +855,33 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                               ? `WA ${snapshot.employeeName} ditandai gagal.`
                               : `Nomor WhatsApp ${snapshot.employeeName} masih kosong.`,
                           )}
+                          size="sm"
                           type="button"
+                          variant="destructive"
                         >
                           Gagal
-                        </button>
+                        </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {!isLoadingSnapshots && selectedPeriod && snapshots.length === 0 ? (
-                  <tr>
-                    <td colSpan={7}>Belum ada snapshot. Langkah berikutnya adalah import Excel data slip.</td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={7}>Belum ada slip karyawan. Langkah berikutnya adalah import Excel data slip.</TableCell>
+                  </TableRow>
                 ) : null}
                 {!isLoadingSnapshots && !selectedPeriod ? (
-                  <tr>
-                    <td colSpan={7}>Pilih atau buat periode slip terlebih dahulu.</td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={7}>Pilih atau buat periode slip terlebih dahulu.</TableCell>
+                  </TableRow>
                 ) : null}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
-    </section>
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 
@@ -810,31 +905,6 @@ function formatPreviewStatus(status: PayslipImportPreviewRow["status"]): string 
   }
 
   return status === "valid" ? "Valid" : "Error";
-}
-
-function defaultPeriodLabel(): string {
-  const now = new Date();
-  return `Slip Gaji ${now.toLocaleDateString("id-ID", {
-    month: "long",
-    year: "numeric",
-  })}`;
-}
-
-function defaultPeriodStart(): string {
-  const now = new Date();
-  return formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
-}
-
-function defaultPeriodEnd(): string {
-  const now = new Date();
-  return formatDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-}
-
-function formatDateInput(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function fileNameFromPath(path: string): string {

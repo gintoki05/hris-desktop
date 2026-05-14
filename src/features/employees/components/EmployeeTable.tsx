@@ -1,3 +1,12 @@
+import { PanelNote, StatusBadge } from "../../../components/shared/FeaturePanel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import { EMPLOYEE_STATUS_OPTIONS, EMPLOYMENT_TYPE_OPTIONS } from "../constants";
 import { formatRupiah } from "../../../lib/formatters/currency";
 import { labelFor } from "../services/employee-export.service";
@@ -17,52 +26,53 @@ export function EmployeeTable({
   selectedEmployeeId,
 }: EmployeeTableProps) {
   return (
-    <div className="employee-table-wrap">
-      {isLoading ? <p className="status-note">Membaca data karyawan lokal...</p> : null}
-      <table className="employee-table">
-        <thead>
-          <tr>
-            <th>Nama</th>
-            <th>WhatsApp</th>
-            <th>Email</th>
-            <th>Departemen</th>
-            <th>Jabatan</th>
-            <th>Sistem</th>
-            <th>Gaji Pokok</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="overflow-x-auto rounded-lg border border-border">
+      {isLoading ? <PanelNote>Membaca data karyawan lokal...</PanelNote> : null}
+      <Table className="w-full caption-bottom text-sm">
+        <TableHeader className="border-b bg-muted/50">
+          <TableRow className="border-b transition-colors">
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Nama</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">WhatsApp</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Email</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Departemen</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Jabatan</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Sistem</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Gaji Pokok</TableHead>
+            <TableHead className="h-10 px-3 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {employees.map((employee) => (
-            <tr
+            <TableRow
+              className="cursor-pointer border-b transition-colors hover:bg-muted/50 data-[selected=true]:bg-muted"
               data-selected={employee.id === selectedEmployeeId}
               key={employee.id}
               onClick={() => onSelect(employee)}
             >
-              <td>
+              <TableCell className="p-3 align-middle">
                 <strong>{employee.name}</strong>
                 <span>{employee.nik}</span>
-              </td>
-              <td>{maskWhatsAppNumber(employee.whatsappNumber)}</td>
-              <td>{maskEmail(employee.email)}</td>
-              <td>{employee.department}</td>
-              <td>{employee.position}</td>
-              <td>{labelFor(employee.employmentType, EMPLOYMENT_TYPE_OPTIONS)}</td>
-              <td>{formatRupiah(employee.salaryAmount)}</td>
-              <td>
-                <span className="status-pill">
-                  {labelFor(employee.status, EMPLOYEE_STATUS_OPTIONS)}
-                </span>
-              </td>
-            </tr>
+              </TableCell>
+              <TableCell className="p-3 align-middle">{maskWhatsAppNumber(employee.whatsappNumber)}</TableCell>
+              <TableCell className="p-3 align-middle">{maskEmail(employee.email)}</TableCell>
+              <TableCell className="p-3 align-middle">{employee.department}</TableCell>
+              <TableCell className="p-3 align-middle">{employee.position}</TableCell>
+              <TableCell className="p-3 align-middle">{labelFor(employee.employmentType, EMPLOYMENT_TYPE_OPTIONS)}</TableCell>
+              <TableCell className="p-3 align-middle">{formatRupiah(employee.salaryAmount)}</TableCell>
+              <TableCell className="p-3 align-middle">
+                <StatusBadge>{labelFor(employee.status, EMPLOYEE_STATUS_OPTIONS)}</StatusBadge>
+              </TableCell>
+            </TableRow>
           ))}
           {!isLoading && employees.length === 0 ? (
-            <tr>
-              <td colSpan={8}>Belum ada data karyawan sesuai filter.</td>
-            </tr>
+            <TableRow>
+              <TableCell className="p-6 text-center text-muted-foreground" colSpan={8}>
+                Belum ada data karyawan sesuai filter.
+              </TableCell>
+            </TableRow>
           ) : null}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

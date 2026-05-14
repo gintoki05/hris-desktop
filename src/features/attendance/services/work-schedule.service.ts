@@ -1,3 +1,4 @@
+import { formatDisplayDateRange } from "../../../lib/formatters/date-time";
 import { tauriWorkScheduleRepository } from "../repositories/tauri-work-schedule.repository";
 import type { WorkScheduleRepository } from "../repositories/work-schedule.repository";
 import type {
@@ -35,7 +36,7 @@ export function createEmptyWorkSchedulePeriod(
   endDate: string,
 ): WorkSchedulePeriodInput {
   return {
-    label: `Jadwal ${startDate} s.d. ${endDate}`,
+    label: `Jadwal ${formatDisplayDateRange(startDate, endDate)}`,
     startDate,
     endDate,
     entries: [],

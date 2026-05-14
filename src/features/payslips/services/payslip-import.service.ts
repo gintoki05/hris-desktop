@@ -229,8 +229,32 @@ function buildPreviewRows(
     if (!employeeName) {
       problems.push("Nama pegawai wajib diisi.");
     }
+    if (!employeeNik) {
+      problems.push("NIK pegawai wajib diisi.");
+    }
+    if (!employeePosition) {
+      problems.push("Jabatan pegawai wajib diisi.");
+    }
+    if (hasNegativeAmount(incomeComponents)) {
+      problems.push("Komponen pendapatan tidak boleh negatif.");
+    }
+    if (hasNegativeAmount(deductionComponents)) {
+      problems.push("Komponen potongan tidak boleh negatif.");
+    }
+    if (grossPay !== computedGrossPay) {
+      problems.push("Jumlah pendapatan tidak sama dengan total komponen pendapatan.");
+    }
+    if (totalDeductions !== computedDeductions) {
+      problems.push("Jumlah potongan tidak sama dengan total komponen potongan.");
+    }
+    if (netPay !== grossPay - totalDeductions) {
+      problems.push("Gaji bersih tidak sama dengan pendapatan dikurangi potongan.");
+    }
     if (netPay < 0) {
       problems.push("Gaji bersih tidak boleh negatif.");
+    }
+    if (!amountInWords) {
+      problems.push("Terbilang wajib diisi untuk slip PDF.");
     }
 
     const warnings: string[] = [];
@@ -440,6 +464,10 @@ function readOptionalAmount(row: unknown[], columnIndex: number | undefined): nu
 
 function sumAmounts(components: Array<{ amount: number }>): number {
   return components.reduce((total, component) => total + component.amount, 0);
+}
+
+function hasNegativeAmount(components: Array<{ amount: number }>): boolean {
+  return components.some((component) => component.amount < 0);
 }
 
 function normalizeText(value: unknown): string {

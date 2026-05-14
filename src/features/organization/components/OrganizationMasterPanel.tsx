@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import { FeaturePanel, PanelBody, PanelNote, StatusBadge } from "../../../components/shared/FeaturePanel";
 import { PaginationControls } from "../../../components/shared/PaginationControls";
+import { Button } from "../../../components/ui/button";
+import { Checkbox } from "../../../components/ui/checkbox";
+import { Input } from "../../../components/ui/input";
 import type { AuthSession } from "../../auth/types";
 import {
   getOrganizationMasterData,
@@ -142,21 +146,22 @@ export function OrganizationMasterPanel({ canEdit, session }: OrganizationMaster
   const disabled = !canEdit || isSaving || isLoading;
 
   return (
-    <section className="panel" aria-label="Master departemen dan jabatan">
-      <div className="panel-header">
-        <h2>Master Referensi Karyawan</h2>
-        <span className="status-pill">{canEdit ? "Admin bisa edit" : "Readonly"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Master departemen dan jabatan"
+      badge={<StatusBadge>{canEdit ? "Admin bisa edit" : "Readonly"}</StatusBadge>}
+      title="Master Referensi Karyawan"
+    >
+      <PanelBody>
 
-      {isLoading ? <p className="status-note">Membaca master referensi lokal...</p> : null}
+      {isLoading ? <PanelNote>Membaca master referensi lokal...</PanelNote> : null}
       {!canEdit ? (
-        <p className="readonly-note">Role saat ini hanya bisa melihat master referensi.</p>
+        <PanelNote tone="warning">Role saat ini hanya bisa melihat master referensi.</PanelNote>
       ) : null}
       {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
       {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
       {draft ? (
-        <div className="attendance-master-content">
+        <div className="grid gap-4">
           <ReferenceSection
             canEdit={canEdit}
             disabled={disabled}
@@ -178,14 +183,15 @@ export function OrganizationMasterPanel({ canEdit, session }: OrganizationMaster
             onUpdate={(index, patch) => updateItem("positions", index, patch)}
           />
 
-          <div className="settings-actions">
-            <button disabled={disabled || !masterChanged(masterData, draft)} onClick={handleSave} type="button">
+          <div className="flex justify-end">
+            <Button disabled={disabled || !masterChanged(masterData, draft)} onClick={handleSave} type="button">
               {isSaving ? "Menyimpan..." : "Simpan Master Referensi"}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
-    </section>
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 
@@ -228,24 +234,27 @@ function ReferenceSection({
   }
 
   return (
-    <div className="master-section">
-      <div className="master-section-header">
-        <div className="master-section-title">
-          <h3>{title}</h3>
-          <span>{items.length} item tersimpan di master</span>
+    <div className="rounded-lg border bg-background p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-1">
+          <h3 className="font-semibold leading-none">{title}</h3>
+          <span className="text-sm text-muted-foreground">{items.length} item tersimpan di master</span>
         </div>
         {canEdit ? (
-          <button disabled={disabled} onClick={handleAdd} type="button">
+          <Button disabled={disabled} onClick={handleAdd} type="button" variant="outline">
             Tambah {title}
-          </button>
+          </Button>
         ) : null}
       </div>
-      <div className="master-row-list">
+      <div className="mt-4 grid gap-3">
         {paginatedItems.map((item, index) => (
-          <div className="master-row master-row-reference" key={item.id}>
+          <div
+            className="grid gap-3 rounded-lg border border-border bg-card p-3 lg:grid-cols-[minmax(220px,1fr)_120px_100px_auto]"
+            key={item.id}
+          >
             <label>
               Nama
-              <input
+              <Input
                 disabled={disabled}
                 maxLength={100}
                 onChange={(event) => onUpdate(pageStartIndex + index, { name: event.target.value })}
@@ -254,7 +263,7 @@ function ReferenceSection({
             </label>
             <label>
               Urutan
-              <input
+              <Input
                 disabled={disabled}
                 onChange={(event) =>
                   onUpdate(pageStartIndex + index, { sortOrder: readNumber(event.target.value, 0) })
@@ -263,25 +272,24 @@ function ReferenceSection({
                 value={item.sortOrder}
               />
             </label>
-            <label className="inline-check">
-              <input
+            <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Checkbox
                 checked={item.isActive}
                 disabled={disabled}
-                onChange={(event) => onUpdate(pageStartIndex + index, { isActive: event.target.checked })}
-                type="checkbox"
+                onCheckedChange={(checked) => onUpdate(pageStartIndex + index, { isActive: checked === true })}
               />
               Aktif
             </label>
-            <div className="master-row-actions">
+            <div className="flex items-end justify-end">
               {canRemove(item.id) ? (
-                <button
-                  className="master-row-action"
+                <Button
                   disabled={disabled}
                   onClick={() => onRemove(item.id)}
                   type="button"
+                  variant="destructive"
                 >
                   Hapus Baris
-                </button>
+                </Button>
               ) : null}
             </div>
           </div>

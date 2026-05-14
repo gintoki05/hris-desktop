@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import { FeaturePanel, PanelBody, PanelNote, StatusBadge } from "../../../components/shared/FeaturePanel";
 import { PaginationControls } from "../../../components/shared/PaginationControls";
+import { Button } from "../../../components/ui/button";
+import { Checkbox } from "../../../components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import { Input } from "../../../components/ui/input";
 import { getAttendanceMasterData } from "../../attendance/services/attendance-master.service";
 import type { WorkShift } from "../../attendance/types";
 import type { AuthSession } from "../../auth/types";
@@ -85,21 +96,6 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
-
-  useEffect(() => {
-    if (!isEmployeeModalOpen || isSaving) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        handleCloseEmployeeModal();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isEmployeeModalOpen, isSaving]);
 
   useEffect(() => {
     let isMounted = true;
@@ -223,43 +219,48 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
   const disabled = !canEdit || isSaving;
 
   return (
-    <section className="panel" aria-label="Master karyawan dan struktur organisasi">
-      <div className="panel-header">
-        <h2>Master Karyawan</h2>
-        <span className="status-pill">{canEdit ? "Admin bisa edit" : "Readonly"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Master karyawan dan struktur organisasi"
+      badge={<StatusBadge>{canEdit ? "Admin bisa edit" : "Readonly"}</StatusBadge>}
+      title="Master Karyawan"
+    >
+      <PanelBody>
 
       {!canEdit ? (
-        <p className="readonly-note">Role saat ini hanya bisa melihat dan mencari data karyawan.</p>
+        <PanelNote tone="warning">Role saat ini hanya bisa melihat dan mencari data karyawan.</PanelNote>
       ) : null}
       {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
       {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      <div className="employee-content">
-        <div className="employee-toolbar">
-          <label className="employee-search">
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="grid min-w-64 flex-1 gap-2 text-sm font-medium text-foreground">
             Cari karyawan
-            <input
+            <Input
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nama, NIK, departemen, jabatan"
               value={query}
             />
           </label>
-          <label className="inline-check">
-            <input
+          <label className="flex items-center gap-2 pb-2 text-sm font-medium text-foreground">
+            <Checkbox
               checked={includeInactive}
-              onChange={(event) => setIncludeInactive(event.target.checked)}
-              type="checkbox"
+              onCheckedChange={(checked) => setIncludeInactive(checked === true)}
             />
             Tampilkan nonaktif
           </label>
-          <button disabled={employees.length === 0} onClick={() => exportEmployeeCsv(employees)} type="button">
+          <Button
+            disabled={employees.length === 0}
+            onClick={() => exportEmployeeCsv(employees)}
+            type="button"
+            variant="outline"
+          >
             Export CSV Audit
-          </button>
+          </Button>
           {canEdit ? (
-            <button onClick={handleNewEmployee} type="button">
+            <Button onClick={handleNewEmployee} type="button">
               Karyawan Baru
-            </button>
+            </Button>
           ) : null}
         </div>
 
@@ -280,51 +281,40 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
             totalItems={employees.length}
           />
 
-          {isEmployeeModalOpen ? (
-            <div
-              className="employee-modal-backdrop"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) {
-                  handleCloseEmployeeModal();
-                }
-              }}
-            >
-              <div
-                aria-labelledby="employee-modal-title"
-                aria-modal="true"
-                className="employee-modal"
-                role="dialog"
-              >
-                <div className="employee-modal-header">
-                  <div>
-                    <h3 id="employee-modal-title">
-                      {selectedEmployee ? "Edit Karyawan" : "Tambah Karyawan"}
-                    </h3>
-                    <p>{selectedEmployee ? selectedEmployee.name : "Lengkapi data master karyawan baru."}</p>
-                  </div>
-                  <button disabled={isSaving} onClick={handleCloseEmployeeModal} type="button">
-                    Tutup
-                  </button>
-                </div>
+          <Dialog
+            open={isEmployeeModalOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                handleCloseEmployeeModal();
+              }
+            }}
+          >
+            <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-5xl">
+              <DialogHeader>
+                <DialogTitle>{selectedEmployee ? "Edit Karyawan" : "Tambah Karyawan"}</DialogTitle>
+                <DialogDescription>
+                  {selectedEmployee ? selectedEmployee.name : "Lengkapi data master karyawan baru."}
+                </DialogDescription>
+              </DialogHeader>
 
-                <EmployeeForm
-                  departments={organizationMaster.departments}
-                  disabled={disabled}
-                  draft={draft}
-                  isSaving={isSaving}
-                  onDeactivate={() => void handleDeactivate()}
-                  onSubmit={() => void handleSubmit()}
-                  onUpdateDraft={updateDraft}
-                  positions={organizationMaster.positions}
-                  selectedEmployee={selectedEmployee}
-                  workShifts={workShifts}
-                />
-              </div>
-            </div>
-          ) : null}
+              <EmployeeForm
+                departments={organizationMaster.departments}
+                disabled={disabled}
+                draft={draft}
+                isSaving={isSaving}
+                onDeactivate={() => void handleDeactivate()}
+                onSubmit={() => void handleSubmit()}
+                onUpdateDraft={updateDraft}
+                positions={organizationMaster.positions}
+                selectedEmployee={selectedEmployee}
+                workShifts={workShifts}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
-    </section>
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 

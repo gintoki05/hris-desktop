@@ -1,5 +1,15 @@
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
 import { FormattedAmountInput } from "../../../components/shared/FormattedAmountInput";
+import { Button } from "../../../components/ui/button";
+import { Checkbox } from "../../../components/ui/checkbox";
+import { Input } from "../../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
 import type { WorkShift } from "../../attendance/types";
 import type { OrganizationReferenceItem } from "../../organization/types";
 import {
@@ -52,20 +62,22 @@ export function EmployeeForm({
 
   return (
     <form
-      className="employee-form"
+      className="grid gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <fieldset className="settings-fieldset" disabled={disabled}>
-        <legend>{selectedEmployee ? "Detail Karyawan" : "Karyawan Baru"}</legend>
+      <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
+        <legend className="px-1 text-sm font-semibold text-foreground">
+          {selectedEmployee ? "Detail Karyawan" : "Karyawan Baru"}
+        </legend>
         <div className="settings-two-columns">
           <label>
             <span className="field-label">
               Nama <span className="required-label">Wajib</span>
             </span>
-            <input
+            <Input
               maxLength={140}
               onChange={(event) => onUpdateDraft("name", event.target.value)}
               required
@@ -76,7 +88,7 @@ export function EmployeeForm({
             <span className="field-label">
               NIK <span className="required-label">Wajib</span>
             </span>
-            <input
+            <Input
               maxLength={40}
               onChange={(event) => onUpdateDraft("nik", event.target.value)}
               required
@@ -88,7 +100,7 @@ export function EmployeeForm({
         <div className="settings-two-columns">
           <label>
             Nomor WhatsApp
-            <input
+            <Input
               inputMode="tel"
               maxLength={32}
               onChange={(event) => onUpdateDraft("whatsappNumber", event.target.value)}
@@ -98,7 +110,7 @@ export function EmployeeForm({
           </label>
           <label>
             Email slip gaji
-            <input
+            <Input
               maxLength={160}
               onChange={(event) => onUpdateDraft("email", event.target.value)}
               placeholder="pegawai@email.com"
@@ -116,7 +128,7 @@ export function EmployeeForm({
             <span className="field-label">
               Tanggal mulai kerja <span className="required-label">Wajib</span>
             </span>
-            <input
+            <Input
               onChange={(event) => onUpdateDraft("hireDate", event.target.value)}
               required
               type="date"
@@ -125,7 +137,7 @@ export function EmployeeForm({
           </label>
           <label>
             NPWP
-            <input
+            <Input
               maxLength={40}
               onChange={(event) => onUpdateDraft("npwp", event.target.value)}
               value={draft.npwp}
@@ -136,22 +148,26 @@ export function EmployeeForm({
         <div className="settings-two-columns">
           <label>
             Status kawin
-            <select
-              onChange={(event) =>
-                onUpdateDraft("maritalStatus", event.target.value as EmployeeInput["maritalStatus"])
-              }
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("maritalStatus", value as EmployeeInput["maritalStatus"])}
               value={draft.maritalStatus}
             >
-              {MARITAL_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MARITAL_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             Tanggungan
-            <input
+            <Input
               min={0}
               max={10}
               onChange={(event) => onUpdateDraft("dependents", readNumber(event.target.value, 0))}
@@ -166,68 +182,84 @@ export function EmployeeForm({
             <span className="field-label">
               Departemen <span className="required-label">Wajib</span>
             </span>
-            <select
-              onChange={(event) => onUpdateDraft("department", event.target.value)}
-              required
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("department", value)}
               value={draft.department}
             >
-              <option value="">Pilih departemen</option>
-              {departmentOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Pilih departemen" />
+              </SelectTrigger>
+              <SelectContent>
+                {departmentOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             <span className="field-label">
               Jabatan <span className="required-label">Wajib</span>
             </span>
-            <select
-              onChange={(event) => onUpdateDraft("position", event.target.value)}
-              required
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("position", value)}
               value={draft.position}
             >
-              <option value="">Pilih jabatan</option>
-              {positionOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Pilih jabatan" />
+              </SelectTrigger>
+              <SelectContent>
+                {positionOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         </div>
 
         <div className="settings-two-columns">
           <label>
             Status karyawan
-            <select
-              onChange={(event) =>
-                onUpdateDraft("status", event.target.value as EmployeeInput["status"])
-              }
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("status", value as EmployeeInput["status"])}
               value={draft.status}
             >
-              {EMPLOYEE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EMPLOYEE_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             Sistem gaji
-            <select
-              onChange={(event) =>
-                onUpdateDraft("employmentType", event.target.value as EmployeeInput["employmentType"])
-              }
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("employmentType", value as EmployeeInput["employmentType"])}
               value={draft.employmentType}
             >
-              {EMPLOYMENT_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EMPLOYMENT_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         </div>
 
@@ -251,24 +283,28 @@ export function EmployeeForm({
         <div className="settings-two-columns">
           <label>
             Pembayaran gaji
-            <select
-              onChange={(event) =>
-                onUpdateDraft("paymentMethod", event.target.value as EmployeeInput["paymentMethod"])
-              }
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("paymentMethod", value as EmployeeInput["paymentMethod"])}
               value={draft.paymentMethod}
             >
-              {PAYMENT_METHOD_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHOD_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
-          <label className="inline-check">
-            <input
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Checkbox
               checked={draft.pph21Enabled}
-              onChange={(event) => onUpdateDraft("pph21Enabled", event.target.checked)}
-              type="checkbox"
+              disabled={disabled}
+              onCheckedChange={(checked) => onUpdateDraft("pph21Enabled", checked === true)}
             />
             PPh 21 aktif
           </label>
@@ -277,9 +313,10 @@ export function EmployeeForm({
         <div className="settings-two-columns">
           <label>
             Tipe shift
-            <select
-              onChange={(event) => {
-                const nextShiftType = event.target.value as EmployeeInput["shiftType"];
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => {
+                const nextShiftType = value as EmployeeInput["shiftType"];
                 onUpdateDraft("shiftType", nextShiftType);
 
                 if (nextShiftType === "shift") {
@@ -290,29 +327,38 @@ export function EmployeeForm({
               }}
               value={draft.shiftType}
             >
-              {SHIFT_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHIFT_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             <span className="field-label">
               Jam kerja default <span className="required-label">Wajib</span>
             </span>
-            <select
-              onChange={(event) => onUpdateDraft("workSchedule", event.target.value)}
-              required
+            <Select
+              disabled={disabled}
+              onValueChange={(value) => onUpdateDraft("workSchedule", value)}
               value={draft.workSchedule}
             >
-              <option value="">Pilih jam kerja default</option>
-              {workScheduleOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Pilih jam kerja default" />
+              </SelectTrigger>
+              <SelectContent>
+                {workScheduleOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         </div>
 
@@ -324,14 +370,14 @@ export function EmployeeForm({
         </p>
       ) : null}
 
-      <div className="settings-actions">
-        <button disabled={disabled} type="submit">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button disabled={disabled} type="submit">
           {isSaving ? "Menyimpan..." : selectedEmployee ? "Simpan Perubahan" : "Simpan Karyawan"}
-        </button>
+        </Button>
         {selectedEmployee && selectedEmployee.status === "active" ? (
-          <button disabled={disabled} onClick={onDeactivate} type="button">
+          <Button disabled={disabled} onClick={onDeactivate} type="button" variant="destructive">
             Nonaktifkan
-          </button>
+          </Button>
         ) : null}
       </div>
     </form>

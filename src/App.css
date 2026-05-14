@@ -1578,7 +1578,7 @@ h1 {
 }
 
 .payroll-toolbar button,
-.payslip-queue-summary button,
+.payslip-status-summary button,
 .payslip-queue-actions button {
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -1605,7 +1605,7 @@ h1 {
 }
 
 .payroll-toolbar button:disabled,
-.payslip-queue-summary button:disabled,
+.payslip-status-summary button:disabled,
 .payslip-queue-actions button:disabled {
   background: #f8fafc;
   border-color: #cbd5e1;
@@ -1613,7 +1613,7 @@ h1 {
 }
 
 .payroll-summary,
-.payslip-queue-summary {
+.payslip-status-summary {
   align-items: center;
   background: #ffffff;
   border-bottom: 1px solid var(--app-border-soft);
@@ -1624,13 +1624,13 @@ h1 {
 }
 
 .payroll-summary span,
-.payslip-queue-summary span {
+.payslip-status-summary span {
   color: var(--app-muted-strong);
   font-size: 13px;
 }
 
 .payroll-summary strong,
-.payslip-queue-summary strong {
+.payslip-status-summary strong {
   color: var(--app-primary);
 }
 

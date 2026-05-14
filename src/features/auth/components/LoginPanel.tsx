@@ -1,5 +1,16 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { Alert, AlertDescription } from "../../../components/ui/alert";
+import { Button } from "../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
 import { LOGIN_HELP_TEXT } from "../constants";
 import type { LoginInput } from "../types";
 
@@ -28,17 +39,18 @@ export function LoginPanel({ errorMessage, isLoading, onLogin }: LoginPanelProps
 
   return (
     <main className="login-screen">
-      <section className="login-panel" aria-label="Login lokal">
-        <div className="login-heading">
+      <Card className="w-full max-w-md" aria-label="Login lokal">
+        <CardHeader>
           <p className="eyebrow">HRIS Payroll Klinik</p>
-          <h1>Login Lokal</h1>
-          <p>{LOGIN_HELP_TEXT}</p>
-        </div>
+          <CardTitle>Login Lokal</CardTitle>
+          <CardDescription>{LOGIN_HELP_TEXT}</CardDescription>
+        </CardHeader>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label>
+        <CardContent>
+        <form className="grid gap-4" onSubmit={handleSubmit}>
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             Username
-            <input
+            <Input
               autoComplete="username"
               disabled={isLoading || isSubmitting}
               onChange={(event) => setUsername(event.target.value)}
@@ -47,10 +59,11 @@ export function LoginPanel({ errorMessage, isLoading, onLogin }: LoginPanelProps
             />
           </label>
 
-          <label>
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             Password
-            <span className="password-field">
-              <input
+            <span className="relative">
+              <Input
+                className="pr-10"
                 autoComplete="current-password"
                 disabled={isLoading || isSubmitting}
                 onChange={(event) => setPassword(event.target.value)}
@@ -58,31 +71,39 @@ export function LoginPanel({ errorMessage, isLoading, onLogin }: LoginPanelProps
                 type={isPasswordVisible ? "text" : "password"}
                 value={password}
               />
-              <button
+              <Button
                 aria-label={isPasswordVisible ? "Sembunyikan password" : "Lihat password"}
+                className="absolute right-1 top-1/2 -translate-y-1/2"
                 disabled={isLoading || isSubmitting}
                 onClick={() => setIsPasswordVisible((current) => !current)}
+                size="icon"
                 type="button"
+                variant="ghost"
               >
                 {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-              </button>
+              </Button>
             </span>
           </label>
 
-          {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+          {errorMessage ? (
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          ) : null}
 
-          <button className="primary-button" disabled={isLoading || isSubmitting} type="submit">
+          <Button disabled={isLoading || isSubmitting} type="submit">
             {isSubmitting ? "Memeriksa..." : "Login"}
-          </button>
+          </Button>
         </form>
+        </CardContent>
 
-        <div className="login-accounts" aria-label="Akun awal">
-          <strong>Akun awal V1</strong>
+        <CardFooter className="grid gap-1 text-sm text-muted-foreground" aria-label="Akun awal">
+          <strong className="text-foreground">Akun awal V1</strong>
           <span>admin.payroll / admin</span>
           <span>owner / owner</span>
           <span>viewer / viewer</span>
-        </div>
-      </section>
+        </CardFooter>
+      </Card>
     </main>
   );
 }

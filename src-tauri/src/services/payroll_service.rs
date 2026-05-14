@@ -204,6 +204,20 @@ pub fn finalize_manual_payroll(
         Some(&finalized_at),
         &finalized_at,
     )?;
+    let payslip_period_id = upsert_payslip_period_for_payroll(
+        &transaction,
+        &run_id,
+        &input.period,
+        &finalized_at,
+    )?;
+    let payslip_import_batch_id = reset_payslip_manager_period(
+        &transaction,
+        &payslip_period_id,
+        &run_id,
+        input.items.len(),
+        &input.actor,
+        &finalized_at,
+    )?;
     transaction.execute(
         "
         DELETE FROM payroll_payslip_delivery_statuses
@@ -291,7 +305,44 @@ pub fn finalize_manual_payroll(
                 &finalized_at,
             ],
         )?;
+
+        transaction.execute(
+            "
+            INSERT INTO payslip_snapshots (
+                id, period_id, import_batch_id, employee_id, employee_nik,
+                employee_name, employee_position, whatsapp_number, snapshot_json,
+                net_pay, pdf_file_path, send_status, whatsapp_status, email_status,
+                status_updated_at, created_at, updated_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'pdf_ready',
+                CASE WHEN trim(?8) = '' THEN 'missing_number' ELSE 'not_opened' END,
+                'not_sent', ?12, ?12, ?12)
+            ",
+            params![
+                &snapshot_id,
+                &payslip_period_id,
+                &payslip_import_batch_id,
+                &snapshot.employee.id,
+                &snapshot.employee.nik,
+                &snapshot.employee.name,
+                &snapshot.employee.position,
+                &snapshot.employee.whatsapp_number,
+                &snapshot_json,
+                item.net_pay,
+                pdf_file_path.display().to_string(),
+                &finalized_at,
+            ],
+        )?;
     }
+
+    transaction.execute(
+        "
+        UPDATE payslip_periods
+        SET status = 'pdf_ready', updated_at = ?1
+        WHERE id = ?2
+        ",
+        params![&finalized_at, &payslip_period_id],
+    )?;
 
     transaction.commit()?;
 
@@ -628,6 +679,93 @@ fn upsert_payroll_run(
     )?;
 
     Ok(())
+}
+
+fn upsert_payslip_period_for_payroll(
+    connection: &rusqlite::Connection,
+    run_id: &str,
+    period: &PayrollPeriodInput,
+    now: &str,
+) -> Result<String, AppError> {
+    let existing_period_id: Option<String> = connection
+        .query_row(
+            "
+            SELECT id
+            FROM payslip_periods
+            WHERE start_date = ?1 AND end_date = ?2
+            ",
+            params![period.start_date.trim(), period.end_date.trim()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let period_id = existing_period_id.unwrap_or_else(|| run_id.to_string());
+
+    connection.execute(
+        "
+        INSERT INTO payslip_periods (
+            id, label, start_date, end_date, status, created_at, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, 'pdf_ready', ?5, ?5)
+        ON CONFLICT(id) DO UPDATE SET
+            label = excluded.label,
+            start_date = excluded.start_date,
+            end_date = excluded.end_date,
+            status = 'pdf_ready',
+            updated_at = excluded.updated_at
+        ",
+        params![
+            &period_id,
+            period.label.trim(),
+            period.start_date.trim(),
+            period.end_date.trim(),
+            now,
+        ],
+    )?;
+
+    Ok(period_id)
+}
+
+fn reset_payslip_manager_period(
+    connection: &rusqlite::Connection,
+    period_id: &str,
+    run_id: &str,
+    employee_count: usize,
+    actor: &PayrollActor,
+    now: &str,
+) -> Result<String, AppError> {
+    connection.execute(
+        "DELETE FROM payslip_snapshots WHERE period_id = ?1",
+        [period_id],
+    )?;
+    connection.execute(
+        "DELETE FROM payslip_import_batches WHERE period_id = ?1",
+        [period_id],
+    )?;
+
+    let batch_id = format!("{run_id}-payroll-final");
+    connection.execute(
+        "
+        INSERT INTO payslip_import_batches (
+            id, period_id, source_file_name, imported_by_user_id,
+            imported_by_display_name, imported_by_role, total_rows, valid_rows,
+            error_rows, notes, imported_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, 0, ?8, ?9)
+        ",
+        params![
+            &batch_id,
+            period_id,
+            "Finalisasi payroll manual",
+            actor.user_id.trim(),
+            actor.display_name.trim(),
+            actor.role.trim(),
+            employee_count as i64,
+            "Dibuat otomatis dari payroll final. Jangan gabungkan dengan queue slip lama.",
+            now,
+        ],
+    )?;
+
+    Ok(batch_id)
 }
 
 trait SnapshotFileId {

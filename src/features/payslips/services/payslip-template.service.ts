@@ -1,4 +1,5 @@
 import type { PayslipSnapshot } from "../types";
+import { formatDisplayDateText } from "../../../lib/formatters/date-time";
 
 const incomeOrder = [
   "Gaji Pokok",
@@ -81,7 +82,7 @@ export function createOfflinePayslipPrintHtml(snapshot: PayslipSnapshot): string
   <div class="company">
     <h1>${escapeHtml(snapshot.company.name)}</h1>
     <div>${escapeHtml(snapshot.company.address)}</div>
-    <div class="period">Periode: ${escapeHtml(snapshot.payroll.period.label)}</div>
+    <div class="period">Periode: ${escapeHtml(formatDisplayDateText(snapshot.payroll.period.label))}</div>
   </div>
   <table>
     <tr><th>NIK</th><td>${escapeHtml(snapshot.employee.nik)}</td><th>Nama</th><td>${escapeHtml(snapshot.employee.name)}</td></tr>

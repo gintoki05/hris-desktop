@@ -1,5 +1,10 @@
 import { type ChangeEvent, useEffect, useState } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import { FeaturePanel, PanelBody, PanelNote, StatusBadge } from "../../../components/shared/FeaturePanel";
+import { Button, buttonVariants } from "../../../components/ui/button";
+import { Checkbox } from "../../../components/ui/checkbox";
+import { Input } from "../../../components/ui/input";
+import { Textarea } from "../../../components/ui/textarea";
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import { getMasterSettings, updateMasterSettings } from "../services/master-settings.service";
@@ -148,28 +153,28 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
   const disabled = !canEdit || isSaving || isLoading;
 
   return (
-    <section className="panel" aria-label="Master perusahaan dan pengiriman slip">
-      <div className="panel-header">
-        <h2>Master Perusahaan & Pengiriman Slip</h2>
-        <span className="status-pill">{canEdit ? "Admin bisa edit" : "Readonly"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Master perusahaan dan pengiriman slip"
+      badge={<StatusBadge>{canEdit ? "Admin bisa edit" : "Readonly"}</StatusBadge>}
+      title="Master Perusahaan & Pengiriman Slip"
+    >
+      <PanelBody>
+        {isLoading ? <PanelNote>Membaca setting lokal...</PanelNote> : null}
+        {!canEdit ? (
+          <PanelNote tone="warning">Role saat ini hanya bisa melihat setting, tidak menyimpan perubahan.</PanelNote>
+        ) : null}
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {isLoading ? <p className="status-note">Membaca setting lokal...</p> : null}
-      {!canEdit ? (
-        <p className="readonly-note">Role saat ini hanya bisa melihat setting, tidak menyimpan perubahan.</p>
-      ) : null}
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
-
-      {draft ? (
-        <div className="settings-content">
-          <div className="settings-form-grid">
-            <fieldset className="settings-fieldset" disabled={disabled}>
-              <legend className="visually-hidden">Perusahaan</legend>
-              <div className="settings-fieldset-title">Perusahaan</div>
+        {draft ? (
+          <div className="settings-content">
+            <div className="settings-form-grid">
+              <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
+                <legend className="visually-hidden">Perusahaan</legend>
+                <div className="text-sm font-semibold text-foreground">Perusahaan</div>
               <label>
                 Nama perusahaan
-                <input
+                <Input
                   maxLength={120}
                   onChange={(event) => updateCompanyField("companyName", event.target.value)}
                   required
@@ -187,29 +192,31 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                     )}
                   </div>
                   <div className="logo-upload-actions">
-                    <label className="secondary-file-button">
+                    <label className={buttonVariants({ variant: "outline" })}>
                       Pilih Logo
                       <input
+                        className="sr-only"
                         accept="image/png,image/jpeg,image/webp"
                         disabled={disabled}
                         onChange={handleLogoChange}
                         type="file"
                       />
                     </label>
-                    <button
+                    <Button
                       disabled={disabled || !draft.company.logoDataUrl}
                       onClick={() => updateCompanyField("logoDataUrl", "")}
                       type="button"
+                      variant="outline"
                     >
                       Hapus
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <span className="field-help">PNG, JPG, atau WebP. Maksimal 512 KB.</span>
               </div>
               <label>
                 Alamat
-                <textarea
+                <Textarea
                   maxLength={500}
                   onChange={(event) => updateCompanyField("address", event.target.value)}
                   rows={3}
@@ -219,7 +226,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               <div className="settings-two-columns">
                 <label>
                   Telepon/kontak
-                  <input
+                  <Input
                     maxLength={60}
                     onChange={(event) => updateCompanyField("contactPhone", event.target.value)}
                     value={draft.company.contactPhone}
@@ -227,7 +234,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                 </label>
                 <label>
                   Email
-                  <input
+                  <Input
                     maxLength={120}
                     onChange={(event) => updateCompanyField("contactEmail", event.target.value)}
                     type="email"
@@ -237,28 +244,28 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               </div>
               <label>
                 Nama bendahara
-                <input
+                <Input
                   maxLength={120}
                   onChange={(event) => updateCompanyField("treasurerName", event.target.value)}
                   value={draft.company.treasurerName}
                 />
               </label>
-            </fieldset>
+              </fieldset>
 
-            <fieldset className="settings-fieldset" disabled={disabled}>
-              <legend className="visually-hidden">Pengiriman Email</legend>
-              <div className="settings-fieldset-title">Pengiriman Email Resend</div>
-              <label className="inline-check">
-                <input
+              <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
+                <legend className="visually-hidden">Pengiriman Email</legend>
+                <div className="text-sm font-semibold text-foreground">Pengiriman Email Resend</div>
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Checkbox
                   checked={draft.emailDelivery.enabled}
-                  onChange={(event) => updateEmailDeliveryField("enabled", event.target.checked)}
-                  type="checkbox"
+                  disabled={disabled}
+                  onCheckedChange={(checked) => updateEmailDeliveryField("enabled", checked === true)}
                 />
                 Aktifkan pengiriman slip lewat email
               </label>
               <label>
                 API key Resend
-                <input
+                <Input
                   autoComplete="off"
                   maxLength={220}
                   onChange={(event) => updateEmailDeliveryField("resendApiKey", event.target.value)}
@@ -273,7 +280,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               <div className="settings-two-columns">
                 <label>
                   Nama pengirim
-                  <input
+                  <Input
                     maxLength={120}
                     onChange={(event) => updateEmailDeliveryField("fromName", event.target.value)}
                     value={draft.emailDelivery.fromName}
@@ -281,7 +288,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                 </label>
                 <label>
                   Email pengirim
-                  <input
+                  <Input
                     maxLength={160}
                     onChange={(event) => updateEmailDeliveryField("fromEmail", event.target.value)}
                     type="email"
@@ -291,7 +298,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               </div>
               <label>
                 Reply-to email
-                <input
+                <Input
                   maxLength={160}
                   onChange={(event) => updateEmailDeliveryField("replyToEmail", event.target.value)}
                   placeholder="Opsional"
@@ -299,33 +306,34 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                   value={draft.emailDelivery.replyToEmail}
                 />
               </label>
-            </fieldset>
+              </fieldset>
 
-          </div>
+            </div>
 
-          <div className="settings-actions">
-            <button disabled={disabled || !settingsChanged(settings, draft)} onClick={handleSave} type="button">
-              {isSaving ? "Menyimpan..." : "Simpan Setting"}
-            </button>
-          </div>
+            <div className="flex justify-end">
+              <Button disabled={disabled || !settingsChanged(settings, draft)} onClick={handleSave} type="button">
+                {isSaving ? "Menyimpan..." : "Simpan Setting"}
+              </Button>
+            </div>
 
-          <div className="audit-list" aria-label="Audit perubahan setting">
-            <h3>Audit Terakhir</h3>
-            {draft.recentAuditEvents.length > 0 ? (
-              draft.recentAuditEvents.map((event) => (
-                <div className="audit-row" key={event.id}>
-                  <strong>{event.actorDisplayName}</strong>
-                  <span>{event.changeSummary}</span>
-                  <time>{formatLocalDateTimeFromUtc(event.createdAt)}</time>
-                </div>
-              ))
-            ) : (
-              <p>Belum ada perubahan setting yang tersimpan.</p>
-            )}
+            <div className="audit-list" aria-label="Audit perubahan setting">
+              <h3>Audit Terakhir</h3>
+              {draft.recentAuditEvents.length > 0 ? (
+                draft.recentAuditEvents.map((event) => (
+                  <div className="audit-row" key={event.id}>
+                    <strong>{event.actorDisplayName}</strong>
+                    <span>{event.changeSummary}</span>
+                    <time>{formatLocalDateTimeFromUtc(event.createdAt)}</time>
+                  </div>
+                ))
+              ) : (
+                <p>Belum ada perubahan setting yang tersimpan.</p>
+              )}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </section>
+        ) : null}
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 

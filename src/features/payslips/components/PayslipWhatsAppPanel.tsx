@@ -1,7 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import {
+  FeaturePanel,
+  PanelBody,
+  PanelNote,
+  StatusBadge,
+} from "../../../components/shared/FeaturePanel";
+import { Button } from "../../../components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import { formatRupiah } from "../../../lib/formatters/currency";
+import { formatDisplayDateText } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import {
   listPayslipDeliveryQueue,
@@ -92,7 +108,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
     try {
       const message = createPayslipWhatsAppMessage({
         employeeName: item.employeeName,
-        payrollPeriod: item.periodLabel,
+        payrollPeriod: formatDisplayDateText(item.periodLabel),
         whatsappNumber: item.whatsappNumber,
         pdfFileName: fileNameFromPath(item.pdfFilePath),
       });
@@ -108,7 +124,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
     try {
       const message = createPayslipWhatsAppMessage({
         employeeName: item.employeeName,
-        payrollPeriod: item.periodLabel,
+        payrollPeriod: formatDisplayDateText(item.periodLabel),
         whatsappNumber: item.whatsappNumber,
         pdfFileName: fileNameFromPath(item.pdfFilePath),
       });
@@ -161,116 +177,130 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
   }
 
   return (
-    <section className="panel" aria-label="Queue pengiriman slip gaji">
-      <div className="panel-header">
-        <h2>Queue Pengiriman Slip</h2>
-        <span className="status-pill">Email otomatis + WA manual</span>
-      </div>
+    <FeaturePanel
+      aria-label="Queue pengiriman slip gaji"
+      badge={<StatusBadge>Email otomatis + WA manual</StatusBadge>}
+      title="Queue Pengiriman Slip"
+    >
+      <PanelBody>
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
+        <div className="payslip-queue-summary">
+          <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
+          <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
+          <span>Email terkirim: <strong>{summary.emailSent}</strong></span>
+          <span>Belum terkirim via jalur apa pun: <strong>{summary.undelivered}</strong></span>
+          <Button onClick={() => void refreshQueue()} type="button" variant="outline">
+            Refresh
+          </Button>
+        </div>
 
-      <div className="payslip-queue-summary">
-        <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
-        <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
-        <span>Email terkirim: <strong>{summary.emailSent}</strong></span>
-        <span>Belum terkirim via jalur apa pun: <strong>{summary.undelivered}</strong></span>
-        <button onClick={() => void refreshQueue()} type="button">Refresh</button>
-      </div>
-
-      <div className="payslip-queue-table-wrap">
-        {isLoading ? <p className="status-note">Membaca queue slip final...</p> : null}
-        <table className="payslip-queue-table">
-          <thead>
-            <tr>
-              <th>Karyawan</th>
-              <th>Periode</th>
-              <th>Nomor WA</th>
-              <th>Alamat Email</th>
-              <th>Gaji Bersih</th>
-              <th>PDF</th>
-              <th>WA</th>
-              <th>Email</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div className="overflow-x-auto rounded-lg border bg-background">
+          {isLoading ? <PanelNote>Membaca queue slip final...</PanelNote> : null}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Karyawan</TableHead>
+              <TableHead>Periode</TableHead>
+              <TableHead>Nomor WA</TableHead>
+              <TableHead>Alamat Email</TableHead>
+              <TableHead>Gaji Bersih</TableHead>
+              <TableHead>PDF</TableHead>
+              <TableHead>WA</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {queue.map((item) => (
-              <tr key={item.payslipSnapshotId} data-status={getWhatsappStatus(item)}>
-                <td>
-                  <strong>{item.employeeName}</strong>
-                  <span>{item.employeeNik} | {item.employeePosition}</span>
-                </td>
-                <td>{item.periodLabel}</td>
-                <td>{item.whatsappNumber ? maskWhatsAppNumber(item.whatsappNumber) : "-"}</td>
-                <td>{maskEmail(item.employeeEmail)}</td>
-                <td>{formatRupiah(item.netPay)}</td>
-                <td>{fileNameFromPath(item.pdfFilePath)}</td>
-                <td>
-                  <span className="status-pill">{WHATSAPP_STATUS_LABELS[getWhatsappStatus(item)]}</span>
+              <TableRow key={item.payslipSnapshotId} data-status={getWhatsappStatus(item)}>
+                <TableCell>
+                  <strong className="block font-semibold">{item.employeeName}</strong>
+                  <span className="block text-muted-foreground">{item.employeeNik} | {item.employeePosition}</span>
+                </TableCell>
+                <TableCell>{formatDisplayDateText(item.periodLabel)}</TableCell>
+                <TableCell>{item.whatsappNumber ? maskWhatsAppNumber(item.whatsappNumber) : "-"}</TableCell>
+                <TableCell>{maskEmail(item.employeeEmail)}</TableCell>
+                <TableCell>{formatRupiah(item.netPay)}</TableCell>
+                <TableCell>{fileNameFromPath(item.pdfFilePath)}</TableCell>
+                <TableCell>
+                  <StatusBadge>{WHATSAPP_STATUS_LABELS[getWhatsappStatus(item)]}</StatusBadge>
                   {item.whatsappErrorMessage ? <span className="delivery-error-note">{item.whatsappErrorMessage}</span> : null}
-                </td>
-                <td>
-                  <span className="status-pill">{EMAIL_STATUS_LABELS[getEmailStatus(item)]}</span>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge>{EMAIL_STATUS_LABELS[getEmailStatus(item)]}</StatusBadge>
                   {item.emailErrorMessage ? <span className="delivery-error-note">{item.emailErrorMessage}</span> : null}
-                </td>
-                <td>
-                  <div className="payslip-queue-actions">
-                    <button
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
                       disabled={isUpdating === item.payslipSnapshotId || !item.employeeEmail || !item.pdfFilePath}
                       onClick={() => void sendEmail(item)}
+                      size="sm"
                       type="button"
                     >
                       Kirim Email
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={isUpdating === item.payslipSnapshotId || !item.pdfFilePath}
                       onClick={() => void openPdf(item)}
+                      size="sm"
                       type="button"
+                      variant="outline"
                     >
                       Buka PDF
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={isUpdating === item.payslipSnapshotId || !item.whatsappNumber}
                       onClick={() => void openWhatsApp(item)}
+                      size="sm"
                       type="button"
+                      variant="outline"
                     >
                       Buka WA
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={isUpdating === item.payslipSnapshotId || !item.whatsappNumber}
                       onClick={() => void copyMessage(item)}
+                      size="sm"
                       type="button"
+                      variant="outline"
                     >
                       Salin
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={isUpdating === item.payslipSnapshotId}
                       onClick={() => void setItemStatus(item, "sent_manual")}
+                      size="sm"
                       type="button"
+                      variant="secondary"
                     >
                       Terkirim
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={isUpdating === item.payslipSnapshotId}
                       onClick={() => void setItemStatus(item, item.whatsappNumber ? "failed" : "missing_number")}
+                      size="sm"
                       type="button"
+                      variant="destructive"
                     >
                       Gagal
-                    </button>
+                    </Button>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
             {!isLoading && queue.length === 0 ? (
-              <tr>
-                <td colSpan={9}>Belum ada slip payroll final. Finalisasi payroll dulu.</td>
-              </tr>
+              <TableRow>
+                <TableCell colSpan={9}>Belum ada slip payroll final. Finalisasi payroll dulu.</TableCell>
+              </TableRow>
             ) : null}
-          </tbody>
-        </table>
-      </div>
-    </section>
+          </TableBody>
+        </Table>
+        </div>
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 

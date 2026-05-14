@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes } from "react";
+import { Input } from "@/components/ui/input";
 
 type FormattedAmountInputProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -22,7 +23,7 @@ export function FormattedAmountInput({
   ...inputProps
 }: FormattedAmountInputProps) {
   return (
-    <input
+    <Input
       {...inputProps}
       disabled={disabled}
       inputMode="numeric"

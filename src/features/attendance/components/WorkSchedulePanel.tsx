@@ -1,5 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNotice } from "../../../components/shared/AppNotice";
+import {
+  FeaturePanel,
+  PanelBody,
+  PanelNote,
+  StatusBadge,
+} from "../../../components/shared/FeaturePanel";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
+import {
+  formatDisplayDateText,
+  getCurrentMonthDateRange,
+} from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import { listActiveEmployees } from "../../employees/services/employee.service";
 import type { Employee } from "../../employees/types";
@@ -25,8 +52,9 @@ type WorkSchedulePanelProps = {
 };
 
 export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) {
-  const [startDate, setStartDate] = useState(getCurrentMonthStart());
-  const [endDate, setEndDate] = useState(getCurrentMonthEnd());
+  const initialDateRange = useMemo(() => getCurrentMonthDateRange(), []);
+  const [startDate, setStartDate] = useState(initialDateRange.startDate);
+  const [endDate, setEndDate] = useState(initialDateRange.endDate);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [masterData, setMasterData] = useState<AttendanceMasterData | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState<WorkSchedulePeriod | null>(null);
@@ -59,7 +87,7 @@ export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) 
         setSuccessMessage(null);
         setNoticeMessage((currentNotice) =>
           period && (period.startDate !== startDate || period.endDate !== endDate)
-            ? `Rentang yang dipilih overlap dengan periode "${period.label}", jadi periode existing itu dibuka.`
+            ? `Rentang yang dipilih overlap dengan periode "${formatDisplayDateText(period.label)}", jadi periode existing itu dibuka.`
             : currentNotice?.startsWith("Rentang yang dipilih overlap")
               ? currentNotice
               : null,
@@ -155,91 +183,92 @@ export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) 
   }
 
   return (
-    <section className="panel" aria-label="Jadwal kerja karyawan">
-      <div className="panel-header">
-        <h2>Jadwal Multi-shift Karyawan</h2>
-        <span className="status-pill">{canEdit ? "Admin bisa edit" : "Readonly"}</span>
-      </div>
+    <FeaturePanel
+      aria-label="Jadwal kerja karyawan"
+      badge={<StatusBadge>{canEdit ? "Admin bisa edit" : "Readonly"}</StatusBadge>}
+      title="Jadwal Multi-shift Karyawan"
+    >
+      <PanelBody>
+        <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.4fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_auto] md:items-end">
+          <label>
+            Label Periode
+            <Input
+              disabled={disabled || !draft}
+              value={draft?.label ?? ""}
+              onChange={(event) => draft && setDraft({ ...draft, label: event.target.value })}
+            />
+          </label>
+          <label>
+            Mulai
+            <Input
+              disabled={isLoading || isSaving}
+              type="date"
+              value={startDate}
+              onChange={(event) => {
+                setNoticeMessage(null);
+                setStartDate(event.target.value);
+              }}
+            />
+          </label>
+          <label>
+            Selesai
+            <Input
+              disabled={isLoading || isSaving}
+              type="date"
+              value={endDate}
+              onChange={(event) => {
+                setNoticeMessage(null);
+                setEndDate(event.target.value);
+              }}
+            />
+          </label>
+          <Button
+            disabled={disabled || employees.length === 0 || activeShifts.length === 0}
+            onClick={handleAddEntry}
+            type="button"
+            variant="outline"
+          >
+            Tambah Jadwal Harian
+          </Button>
+        </div>
 
-      <div className="schedule-toolbar">
-        <label>
-          Label Periode
-          <input
-            disabled={disabled || !draft}
-            value={draft?.label ?? ""}
-            onChange={(event) => draft && setDraft({ ...draft, label: event.target.value })}
-          />
-        </label>
-        <label>
-          Mulai
-          <input
-            disabled={isLoading || isSaving}
-            type="date"
-            value={startDate}
-            onChange={(event) => {
-              setNoticeMessage(null);
-              setStartDate(event.target.value);
-            }}
-          />
-        </label>
-        <label>
-          Selesai
-          <input
-            disabled={isLoading || isSaving}
-            type="date"
-            value={endDate}
-            onChange={(event) => {
-              setNoticeMessage(null);
-              setEndDate(event.target.value);
-            }}
-          />
-        </label>
-        <button
-          disabled={disabled || employees.length === 0 || activeShifts.length === 0}
-          onClick={handleAddEntry}
-          type="button"
-        >
-          Tambah Jadwal Harian
-        </button>
-      </div>
+        {isLoading ? <PanelNote>Membaca jadwal kerja lokal...</PanelNote> : null}
+        {!canEdit ? <PanelNote>Role saat ini hanya bisa melihat jadwal kerja.</PanelNote> : null}
+        {currentPeriod?.isLocked ? (
+          <PanelNote tone="warning">Periode ini sudah terkunci oleh payroll final.</PanelNote>
+        ) : null}
+        {noticeMessage ? <PanelNote>{noticeMessage}</PanelNote> : null}
+        {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+        {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-      {isLoading ? <p className="status-note">Membaca jadwal kerja lokal...</p> : null}
-      {!canEdit ? <p className="readonly-note">Role saat ini hanya bisa melihat jadwal kerja.</p> : null}
-      {currentPeriod?.isLocked ? (
-        <p className="readonly-note">Periode ini sudah terkunci oleh payroll final.</p>
-      ) : null}
-      {noticeMessage ? <p className="readonly-note">{noticeMessage}</p> : null}
-      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
-      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
-
-      {draft ? (
-        <div className="schedule-content">
-          <div className="schedule-table-wrap">
-            <table className="schedule-table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Karyawan Aktif</th>
-                  <th>Tipe</th>
-                  <th>Shift</th>
-                  <th>Catatan</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
+        {draft ? (
+          <div className="schedule-content">
+            <div className="overflow-x-auto rounded-lg border bg-background">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Karyawan Aktif</TableHead>
+                  <TableHead>Tipe</TableHead>
+                  <TableHead>Shift</TableHead>
+                  <TableHead>Catatan</TableHead>
+                  <TableHead>Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {draft.entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={6}>Belum ada jadwal untuk periode ini.</td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={6}>Belum ada jadwal untuk periode ini.</TableCell>
+                  </TableRow>
                 ) : (
                   draft.entries.map((entry, index) => {
                     const employee = employees.find((item) => item.id === entry.employeeId);
                     const shift = activeShifts.find((item) => item.id === entry.shiftId);
 
                     return (
-                      <tr key={entry.id ?? `${entry.employeeId}-${entry.workDate}-${index}`}>
-                        <td>
-                          <input
+                      <TableRow key={entry.id ?? `${entry.employeeId}-${entry.workDate}-${index}`}>
+                        <TableCell>
+                          <Input
                             disabled={disabled}
                             max={endDate}
                             min={startDate}
@@ -249,47 +278,53 @@ export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) 
                               handleEntryChange(index, { workDate: event.target.value })
                             }
                           />
-                        </td>
-                        <td>
-                          <select
+                        </TableCell>
+                        <TableCell>
+                          <Select
                             disabled={disabled}
+                            onValueChange={(employeeId) => handleEntryChange(index, { employeeId })}
                             value={entry.employeeId}
-                            onChange={(event) =>
-                              handleEntryChange(index, { employeeId: event.target.value })
-                            }
                           >
-                            {employees.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name} - {item.position}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <span className="schedule-type-text">
+                            <SelectTrigger className="min-w-56">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name} - {item.position}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
                             {employee ? formatShiftType(employee.shiftType) : "Tidak aktif"}
                           </span>
-                        </td>
-                        <td>
-                          <div className="schedule-shift-cell">
-                            <select
+                        </TableCell>
+                        <TableCell>
+                          <div className="grid gap-1">
+                            <Select
                               disabled={disabled}
+                              onValueChange={(shiftId) => handleEntryChange(index, { shiftId })}
                               value={entry.shiftId}
-                              onChange={(event) =>
-                                handleEntryChange(index, { shiftId: event.target.value })
-                              }
                             >
-                              {activeShifts.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.code} - {item.name}
-                                </option>
-                              ))}
-                            </select>
+                              <SelectTrigger className="min-w-44">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {activeShifts.map((item) => (
+                                  <SelectItem key={item.id} value={item.id}>
+                                    {item.code} - {item.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             {shift ? <span>{shift.startTime} - {shift.endTime}</span> : null}
                           </div>
-                        </td>
-                        <td>
-                          <input
+                        </TableCell>
+                        <TableCell>
+                          <Input
                             disabled={disabled}
                             placeholder="Opsional"
                             value={entry.notes}
@@ -297,36 +332,38 @@ export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) 
                               handleEntryChange(index, { notes: event.target.value })
                             }
                           />
-                        </td>
-                        <td>
-                          <button
+                        </TableCell>
+                        <TableCell>
+                          <Button
                             disabled={disabled || Boolean(entry.id)}
                             onClick={() => handleRemoveEntry(index)}
                             type="button"
+                            variant="outline"
                           >
                             {entry.id ? "Tersimpan" : "Hapus Baris"}
-                          </button>
-                        </td>
-                      </tr>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
-          <div className="settings-actions">
-            <button
+          <div className="flex justify-end">
+            <Button
               disabled={disabled || !scheduleChanged(currentPeriod, draft)}
               onClick={handleSave}
               type="button"
             >
               {isSaving ? "Menyimpan..." : "Simpan Jadwal Kerja"}
-            </button>
+            </Button>
           </div>
         </div>
-      ) : null}
-    </section>
+        ) : null}
+      </PanelBody>
+    </FeaturePanel>
   );
 }
 
@@ -372,23 +409,6 @@ function scheduleChanged(
   draft: WorkSchedulePeriodInput,
 ): boolean {
   return JSON.stringify(current ? toInput(current) : null) !== JSON.stringify(draft);
-}
-
-function getCurrentMonthStart(): string {
-  const now = new Date();
-  return formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
-}
-
-function getCurrentMonthEnd(): string {
-  const now = new Date();
-  return formatDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-}
-
-function formatDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
