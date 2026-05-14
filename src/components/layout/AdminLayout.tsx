@@ -49,44 +49,47 @@ export function AdminLayout({
 }: AdminLayoutProps) {
   return (
     <div className="admin-layout">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            {companyLogoDataUrl ? (
-              <img alt="" src={companyLogoDataUrl} />
-            ) : (
-              "KP"
-            )}
-          </span>
-          <span className="brand-copy">
-            <strong>HRIS Payroll</strong>
-            <span>{companyName}</span>
-          </span>
+      <header className="topbar">
+        <div className="topbar-brand-nav">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">
+              {companyLogoDataUrl ? (
+                <img alt="" src={companyLogoDataUrl} />
+              ) : (
+                "KP"
+              )}
+            </span>
+            <span className="brand-copy">
+              <strong>HRIS Payroll</strong>
+              <span>{companyName}</span>
+            </span>
+          </div>
+          <nav className="nav-list" aria-label="Navigasi utama">
+            {navItems.map((item) => (
+              <button
+                className="nav-item"
+                data-active={item.id === activePage}
+                data-disabled={!can(item.permission)}
+                disabled={!can(item.permission)}
+                key={item.label}
+                onClick={() => onNavigate(item.id)}
+                type="button"
+              >
+                <span className="nav-dot" aria-hidden="true" />
+                {item.label}
+              </button>
+            ))}
+          </nav>
         </div>
-        <nav className="nav-list" aria-label="Navigasi utama">
-          {navItems.map((item) => (
-            <button
-              className="nav-item"
-              data-active={item.id === activePage}
-              data-disabled={!can(item.permission)}
-              disabled={!can(item.permission)}
-              key={item.label}
-              onClick={() => onNavigate(item.id)}
-              type="button"
-            >
-              <span className="nav-dot" aria-hidden="true" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
         <div className="session-panel">
-          <span>{AUTH_ROLE_LABELS[session.user.role]}</span>
-          <strong>{session.user.displayName}</strong>
+          <span>
+            {AUTH_ROLE_LABELS[session.user.role]} - {session.user.displayName}
+          </span>
           <button onClick={onLogout} type="button">
             Logout
           </button>
         </div>
-      </aside>
+      </header>
       <main className="content">{children}</main>
     </div>
   );

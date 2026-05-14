@@ -1,24 +1,53 @@
 import type { ReactNode } from "react";
 
 type MasterSectionProps = {
+  addDisabled?: boolean;
   actionLabel: string;
   canEdit: boolean;
   children: ReactNode;
+  description?: string;
+  itemCount?: number;
+  saveDisabled?: boolean;
+  saveLabel?: string;
   title: string;
   onAdd: () => void;
+  onSave?: () => void;
 };
 
-export function MasterSection({ actionLabel, canEdit, children, onAdd, title }: MasterSectionProps) {
+export function MasterSection({
+  addDisabled = false,
+  actionLabel,
+  canEdit,
+  children,
+  description,
+  itemCount,
+  onAdd,
+  onSave,
+  saveDisabled = false,
+  saveLabel = "Simpan Perubahan",
+  title,
+}: MasterSectionProps) {
   return (
     <div className="master-section">
       <div className="master-section-header">
-        <h3>{title}</h3>
+        <div className="master-section-title">
+          <h3>{title}</h3>
+          {typeof itemCount === "number" ? <span>{itemCount} item tersimpan di master</span> : null}
+        </div>
         {canEdit ? (
-          <button onClick={onAdd} type="button">
-            {actionLabel}
-          </button>
+          <div className="master-section-actions">
+            {onSave ? (
+              <button disabled={saveDisabled} onClick={onSave} type="button">
+                {saveLabel}
+              </button>
+            ) : null}
+            <button disabled={addDisabled} onClick={onAdd} type="button">
+              {actionLabel}
+            </button>
+          </div>
         ) : null}
       </div>
+      {description ? <p className="master-section-description">{description}</p> : null}
       <div className="master-row-list">{children}</div>
     </div>
   );

@@ -8,6 +8,7 @@ import { getOrganizationMasterData } from "../../organization/services/organizat
 import type { OrganizationMasterData } from "../../organization/types";
 import { EmployeeForm } from "./EmployeeForm";
 import { EmployeeTable } from "./EmployeeTable";
+import { FOLLOW_MONTHLY_SCHEDULE_LABEL } from "../constants";
 import { exportEmployeeCsv } from "../services/employee-export.service";
 import {
   createEmployee,
@@ -22,25 +23,6 @@ type EmployeeMasterPanelProps = {
   session: AuthSession;
 };
 
-const emptyEmployeeDraft: EmployeeInput = {
-  nik: "",
-  whatsappNumber: "",
-  email: "",
-  name: "",
-  hireDate: new Date().toISOString().slice(0, 10),
-  npwp: "",
-  maritalStatus: "single",
-  dependents: 0,
-  department: "",
-  position: "",
-  status: "active",
-  employmentType: "monthly",
-  paymentMethod: "cash",
-  pph21Enabled: true,
-  shiftType: "non_shift",
-  workSchedule: "Regular",
-};
-
 const EMPLOYEE_PAGE_SIZE = 5;
 
 export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelProps) {
@@ -53,8 +35,9 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
   const [query, setQuery] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<EmployeeInput>(emptyEmployeeDraft);
+  const [draft, setDraft] = useState<EmployeeInput>(() => createEmptyEmployeeDraft([]));
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -102,6 +85,21 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
+
+  useEffect(() => {
+    if (!isEmployeeModalOpen || isSaving) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        handleCloseEmployeeModal();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isEmployeeModalOpen, isSaving]);
 
   useEffect(() => {
     let isMounted = true;
@@ -157,6 +155,7 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
 
       await refreshEmployees(savedEmployee.id);
       setDraft(toEmployeeInput(savedEmployee));
+      setIsEmployeeModalOpen(false);
       setSuccessMessage(selectedEmployee ? "Data karyawan diperbarui." : "Karyawan baru tersimpan.");
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Data karyawan gagal disimpan.");
@@ -179,6 +178,7 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
       setIncludeInactive(true);
       await refreshEmployees(inactiveEmployee.id, true);
       setDraft(toEmployeeInput(inactiveEmployee));
+      setIsEmployeeModalOpen(false);
       setSuccessMessage("Karyawan dinonaktifkan dan tidak masuk payroll baru secara default.");
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Karyawan gagal dinonaktifkan.");
@@ -190,15 +190,27 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
   function handleSelect(employee: Employee) {
     setSelectedEmployeeId(employee.id);
     setDraft(toEmployeeInput(employee));
+    setIsEmployeeModalOpen(true);
     setSuccessMessage(null);
     setErrorMessage(null);
   }
 
   function handleNewEmployee() {
     setSelectedEmployeeId(null);
-    setDraft(emptyEmployeeDraft);
+    setDraft(createEmptyEmployeeDraft(workShifts));
+    setIsEmployeeModalOpen(true);
     setSuccessMessage(null);
     setErrorMessage(null);
+  }
+
+  function handleCloseEmployeeModal() {
+    if (isSaving) {
+      return;
+    }
+
+    setIsEmployeeModalOpen(false);
+    setSelectedEmployeeId(null);
+    setDraft(createEmptyEmployeeDraft(workShifts));
   }
 
   function updateDraft<K extends keyof EmployeeInput>(field: K, value: EmployeeInput[K]) {
@@ -268,18 +280,48 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
             totalItems={employees.length}
           />
 
-          <EmployeeForm
-            departments={organizationMaster.departments}
-            disabled={disabled}
-            draft={draft}
-            isSaving={isSaving}
-            onDeactivate={() => void handleDeactivate()}
-            onSubmit={() => void handleSubmit()}
-            onUpdateDraft={updateDraft}
-            positions={organizationMaster.positions}
-            selectedEmployee={selectedEmployee}
-            workShifts={workShifts}
-          />
+          {isEmployeeModalOpen ? (
+            <div
+              className="employee-modal-backdrop"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  handleCloseEmployeeModal();
+                }
+              }}
+            >
+              <div
+                aria-labelledby="employee-modal-title"
+                aria-modal="true"
+                className="employee-modal"
+                role="dialog"
+              >
+                <div className="employee-modal-header">
+                  <div>
+                    <h3 id="employee-modal-title">
+                      {selectedEmployee ? "Edit Karyawan" : "Tambah Karyawan"}
+                    </h3>
+                    <p>{selectedEmployee ? selectedEmployee.name : "Lengkapi data master karyawan baru."}</p>
+                  </div>
+                  <button disabled={isSaving} onClick={handleCloseEmployeeModal} type="button">
+                    Tutup
+                  </button>
+                </div>
+
+                <EmployeeForm
+                  departments={organizationMaster.departments}
+                  disabled={disabled}
+                  draft={draft}
+                  isSaving={isSaving}
+                  onDeactivate={() => void handleDeactivate()}
+                  onSubmit={() => void handleSubmit()}
+                  onUpdateDraft={updateDraft}
+                  positions={organizationMaster.positions}
+                  selectedEmployee={selectedEmployee}
+                  workShifts={workShifts}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
@@ -292,6 +334,38 @@ function toEmployeeActor(session: AuthSession): EmployeeActor {
     displayName: session.user.displayName,
     role: session.user.role,
   };
+}
+
+function createEmptyEmployeeDraft(workShifts: WorkShift[]): EmployeeInput {
+  return {
+    nik: "",
+    whatsappNumber: "",
+    email: "",
+    name: "",
+    hireDate: new Date().toISOString().slice(0, 10),
+    npwp: "",
+    maritalStatus: "single",
+    dependents: 0,
+    department: "",
+    position: "",
+    status: "active",
+    employmentType: "monthly",
+    paymentMethod: "cash",
+    pph21Enabled: true,
+    shiftType: "non_shift",
+    workSchedule: getNonShiftDefaultSchedule(workShifts),
+  };
+}
+
+function getNonShiftDefaultSchedule(workShifts: WorkShift[]): string {
+  const nonShift = workShifts.find((shift) => shift.isActive && shift.code === "NONSHIFT");
+  if (!nonShift) {
+    return FOLLOW_MONTHLY_SCHEDULE_LABEL;
+  }
+
+  return nonShift.isOff
+    ? `${nonShift.name} (Off)`
+    : `${nonShift.name} (${nonShift.startTime}-${nonShift.endTime})`;
 }
 
 function toEmployeeInput(employee: Employee): EmployeeInput {

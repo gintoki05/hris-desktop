@@ -20,6 +20,7 @@ export const EMPLOYEE_STATUS_OPTIONS: Array<{ value: EmployeeStatus; label: stri
 
 export const EMPLOYMENT_TYPE_OPTIONS: Array<{ value: EmploymentType; label: string }> = [
   { value: "monthly", label: "Bulanan" },
+  { value: "weekly", label: "Mingguan" },
   { value: "daily", label: "Harian" },
 ];
 
@@ -32,3 +33,5 @@ export const SHIFT_TYPE_OPTIONS: Array<{ value: ShiftType; label: string }> = [
   { value: "non_shift", label: "Non-shift" },
   { value: "shift", label: "Shift" },
 ];
+
+export const FOLLOW_MONTHLY_SCHEDULE_LABEL = "Mengikuti jadwal bulanan";

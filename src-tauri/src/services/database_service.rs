@@ -44,7 +44,7 @@ const MIGRATIONS: &[Migration] = &[
             name TEXT NOT NULL,
             position TEXT NOT NULL,
             npwp TEXT,
-            employment_type TEXT NOT NULL CHECK (employment_type IN ('monthly', 'daily')),
+            employment_type TEXT NOT NULL CHECK (employment_type IN ('monthly', 'weekly', 'daily')),
             shift_type TEXT NOT NULL CHECK (shift_type IN ('shift', 'non_shift')),
             status TEXT NOT NULL CHECK (status IN ('active', 'inactive')),
             created_at TEXT NOT NULL,
@@ -679,6 +679,24 @@ const MIGRATIONS: &[Migration] = &[
             ON payslip_snapshots(whatsapp_status);
         CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_email_status
             ON payslip_snapshots(email_status);
+    ",
+    },
+    Migration {
+        id: "202605140003_employee_weekly_employment_type",
+        sql: "
+        PRAGMA writable_schema = ON;
+
+        UPDATE sqlite_schema
+        SET sql = replace(
+            sql,
+            'employment_type TEXT NOT NULL CHECK (employment_type IN (''monthly'', ''daily''))',
+            'employment_type TEXT NOT NULL CHECK (employment_type IN (''monthly'', ''weekly'', ''daily''))'
+        )
+        WHERE type = 'table'
+            AND name = 'employees'
+            AND sql LIKE '%employment_type TEXT NOT NULL CHECK (employment_type IN (''monthly'', ''daily''))%';
+
+        PRAGMA writable_schema = OFF;
     ",
     },
 ];

@@ -230,7 +230,10 @@ function ReferenceSection({
   return (
     <div className="master-section">
       <div className="master-section-header">
-        <h3>{title}</h3>
+        <div className="master-section-title">
+          <h3>{title}</h3>
+          <span>{items.length} item tersimpan di master</span>
+        </div>
         {canEdit ? (
           <button disabled={disabled} onClick={handleAdd} type="button">
             Tambah {title}

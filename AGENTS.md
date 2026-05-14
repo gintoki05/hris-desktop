@@ -89,6 +89,8 @@ Do not run:
 
 Agents may run dependency installation commands when needed for the current task, but must keep dependencies minimal, well-maintained, compatible with the offline-first desktop direction, and avoid server/cloud/SaaS dependencies unless the user explicitly asks.
 
+Agents may set up frontend UI tooling when the user explicitly asks for it, including Tailwind CSS and shadcn/ui dependencies/configuration for this Vite React Tauri app. Keep setup scoped to UI tooling and required local config files. Do not use UI setup as a reason to introduce a server framework, cloud service, telemetry, or app-wide redesign.
+
 Agents may run read-only inspection commands:
 
 - `Get-ChildItem`
@@ -251,6 +253,14 @@ Payroll and HR business rules must be implemented in TypeScript services by defa
 
 Use shadcn/ui with Tailwind CSS for the desktop admin interface.
 
+If shadcn/ui is not yet installed, agents may implement the manual shadcn/ui setup when the user asks for it:
+
+- Install only the dependencies required for Tailwind CSS, shadcn/ui, and the specific components being added.
+- Add or update `components.json`, Tailwind/global CSS, import aliases, and `src/lib/utils.ts` as needed.
+- Prefer Vite/React-compatible setup; do not add Next.js or React Server Components.
+- Migrate UI incrementally, one screen or component group at a time.
+- Keep existing custom CSS working during transition; remove custom CSS only when the replacement is verified.
+
 Design for clinic admin workflows:
 
 - Dense but readable
@@ -277,7 +287,7 @@ Prefer standard shadcn components for:
 
 Use `lucide-react` icons when icons are needed.
 
-Agents must not run shadcn CLI commands. If shadcn components are needed but missing, list the exact components for the user to add manually.
+Agents may run shadcn CLI commands only when the user explicitly asks to install or add shadcn/ui components. Prefer manual installation/configuration for initial setup when it is clearer and safer. Do not run broad shadcn commands that overwrite unrelated UI files. If a shadcn command fails due to network or permissions, report the exact command and ask the user to run it locally.
 
 Useful reusable UI patterns:
 

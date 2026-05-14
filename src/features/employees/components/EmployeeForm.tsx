@@ -4,6 +4,7 @@ import type { OrganizationReferenceItem } from "../../organization/types";
 import {
   EMPLOYEE_STATUS_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
+  FOLLOW_MONTHLY_SCHEDULE_LABEL,
   MARITAL_STATUS_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   SHIFT_TYPE_OPTIONS,
@@ -38,11 +39,15 @@ export function EmployeeForm({
   const departmentOptions = ensureCurrentOption(activeReferenceNames(departments), draft.department);
   const positionOptions = ensureCurrentOption(activeReferenceNames(positions), draft.position);
   const workScheduleOptions = ensureCurrentOption(
-    workShifts
-      .filter((shift) => shift.isActive)
-      .map(formatWorkShiftOption),
+    [
+      FOLLOW_MONTHLY_SCHEDULE_LABEL,
+      ...workShifts
+        .filter((shift) => shift.isActive)
+        .map(formatWorkShiftOption),
+    ],
     draft.workSchedule,
   );
+  const nonShiftDefaultSchedule = getNonShiftDefaultSchedule(workShifts);
 
   return (
     <form
@@ -108,7 +113,7 @@ export function EmployeeForm({
         <div className="settings-two-columns">
           <label>
             <span className="field-label">
-              Tanggal masuk <span className="required-label">Wajib</span>
+              Tanggal mulai kerja <span className="required-label">Wajib</span>
             </span>
             <input
               onChange={(event) => onUpdateDraft("hireDate", event.target.value)}
@@ -255,9 +260,16 @@ export function EmployeeForm({
           <label>
             Tipe shift
             <select
-              onChange={(event) =>
-                onUpdateDraft("shiftType", event.target.value as EmployeeInput["shiftType"])
-              }
+              onChange={(event) => {
+                const nextShiftType = event.target.value as EmployeeInput["shiftType"];
+                onUpdateDraft("shiftType", nextShiftType);
+
+                if (nextShiftType === "shift") {
+                  onUpdateDraft("workSchedule", FOLLOW_MONTHLY_SCHEDULE_LABEL);
+                } else if (draft.workSchedule === FOLLOW_MONTHLY_SCHEDULE_LABEL) {
+                  onUpdateDraft("workSchedule", nonShiftDefaultSchedule);
+                }
+              }}
               value={draft.shiftType}
             >
               {SHIFT_TYPE_OPTIONS.map((option) => (
@@ -269,14 +281,14 @@ export function EmployeeForm({
           </label>
           <label>
             <span className="field-label">
-              Jam kerja <span className="required-label">Wajib</span>
+              Jam kerja default <span className="required-label">Wajib</span>
             </span>
             <select
               onChange={(event) => onUpdateDraft("workSchedule", event.target.value)}
               required
               value={draft.workSchedule}
             >
-              <option value="">Pilih jam kerja</option>
+              <option value="">Pilih jam kerja default</option>
               {workScheduleOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -330,6 +342,11 @@ function formatWorkShiftOption(shift: WorkShift): string {
   }
 
   return `${shift.name} (${shift.startTime}-${shift.endTime})`;
+}
+
+function getNonShiftDefaultSchedule(workShifts: WorkShift[]): string {
+  const nonShift = workShifts.find((shift) => shift.isActive && shift.code === "NONSHIFT");
+  return nonShift ? formatWorkShiftOption(nonShift) : FOLLOW_MONTHLY_SCHEDULE_LABEL;
 }
 
 function readNumber(value: string, fallback: number): number {

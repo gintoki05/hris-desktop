@@ -1,4 +1,4 @@
-export type EmploymentType = "monthly" | "daily";
+export type EmploymentType = "monthly" | "weekly" | "daily";
 
 export type ShiftType = "shift" | "non_shift";
 

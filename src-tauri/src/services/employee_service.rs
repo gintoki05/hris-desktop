@@ -333,13 +333,13 @@ fn normalize_employee_input(id: String, input: EmployeeInput) -> Result<Employee
 fn validate_employee(employee: &Employee) -> Result<(), AppError> {
     validate_required("nama karyawan", &employee.name)?;
     validate_required("NIK", &employee.nik)?;
-    validate_required("tanggal masuk", &employee.hire_date)?;
+    validate_required("tanggal mulai kerja", &employee.hire_date)?;
     validate_required("departemen", &employee.department)?;
     validate_required("jabatan", &employee.position)?;
 
     if !is_iso_date(&employee.hire_date) {
         return Err(AppError::Database(
-            "tanggal masuk harus memakai format YYYY-MM-DD".to_string(),
+            "tanggal mulai kerja harus memakai format YYYY-MM-DD".to_string(),
         ));
     }
 
@@ -360,7 +360,10 @@ fn validate_employee(employee: &Employee) -> Result<(), AppError> {
         return Err(AppError::Database("status karyawan tidak valid".to_string()));
     }
 
-    if !matches!(employee.employment_type.as_str(), "monthly" | "daily") {
+    if !matches!(
+        employee.employment_type.as_str(),
+        "monthly" | "weekly" | "daily"
+    ) {
         return Err(AppError::Database("sistem gaji tidak valid".to_string()));
     }
 
@@ -377,7 +380,7 @@ fn validate_employee(employee: &Employee) -> Result<(), AppError> {
         return Err(AppError::Database("tipe shift tidak valid".to_string()));
     }
 
-    validate_required("jam kerja", &employee.work_schedule)?;
+    validate_required("jam kerja default", &employee.work_schedule)?;
     validate_optional_email("email karyawan", &employee.email)?;
     Ok(())
 }
