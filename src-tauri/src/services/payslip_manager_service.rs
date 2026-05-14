@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::{
     error::AppError,
-    services::{database_service, settings_service},
+    services::{database_service, payslip_pdf_logo::parse_logo_data_url, settings_service},
 };
 
 #[derive(Clone, Deserialize)]
@@ -146,6 +146,8 @@ struct CompanySnapshot {
     address: String,
     #[serde(rename = "treasurerName")]
     treasurer_name: String,
+    #[serde(rename = "logoDataUrl", default)]
+    logo_data_url: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1100,7 +1102,7 @@ fn get_company_snapshot(connection: &rusqlite::Connection) -> Result<CompanySnap
     connection
         .query_row(
             "
-            SELECT company_name, address, treasurer_name
+            SELECT company_name, address, treasurer_name, logo_data_url
             FROM company_settings
             WHERE id = 'default'
             ",
@@ -1110,6 +1112,7 @@ fn get_company_snapshot(connection: &rusqlite::Connection) -> Result<CompanySnap
                     name: row.get(0)?,
                     address: row.get(1)?,
                     treasurer_name: row.get(2)?,
+                    logo_data_url: row.get(3)?,
                 })
             },
         )
@@ -1366,6 +1369,11 @@ fn write_payslip_pdf(
     company: &CompanySnapshot,
 ) -> Result<(), AppError> {
     let mut page = PdfPage::new();
+    let logo = parse_logo_data_url(&company.logo_data_url).ok().flatten();
+    if let Some(logo_image) = &logo {
+        let (logo_width, logo_height) = logo_image.draw_size(58.0, 48.0);
+        page.image("ImLogo", 48.0, 765.0, logo_width, logo_height);
+    }
     page.text_center(297.5, 792.0, 15.0, true, &company.name);
     page.text_center(297.5, 774.0, 9.5, false, &company.address);
     page.text_center(
@@ -1419,7 +1427,8 @@ fn write_payslip_pdf(
 
     page.rect(42.0, 361.0, 511.0, 72.0);
     page.text(52.0, 414.0, 9.5, true, "Terbilang");
-    for (index, line) in wrap_text(&snapshot.amount_in_words, 74).iter().take(3).enumerate() {
+    let amount_in_words = capitalize_first_letter(&snapshot.amount_in_words);
+    for (index, line) in wrap_text(&amount_in_words, 74).iter().take(3).enumerate() {
         page.text(52.0, 397.0 - (index as f32 * 15.0), 9.5, false, line);
     }
 
@@ -1428,14 +1437,25 @@ fn write_payslip_pdf(
 
     let content = page.finish();
     let stream = format!("{content}\n");
-    let objects = vec![
+    let has_logo = logo.is_some();
+    let image_object_id = 6;
+    let content_object_id = if has_logo { 7 } else { 6 };
+    let xobject_resource = if has_logo {
+        format!(" /XObject << /ImLogo {image_object_id} 0 R >>")
+    } else {
+        String::new()
+    };
+    let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>".to_string(),
+        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >>{xobject_resource} >> /Contents {content_object_id} 0 R >>"),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>".to_string(),
-        format!("<< /Length {} >> stream\n{}endstream", stream.len(), stream),
     ];
+    if let Some(logo_image) = logo {
+        objects.push(logo_image.to_pdf_object());
+    }
+    objects.push(format!("<< /Length {} >> stream\n{}endstream", stream.len(), stream));
     let mut pdf = "%PDF-1.4\n".to_string();
     let mut offsets = vec![0usize];
 
@@ -1501,6 +1521,12 @@ impl PdfPage {
     fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) {
         self.commands
             .push(format!("{x:.1} {y:.1} {width:.1} {height:.1} re S"));
+    }
+
+    fn image(&mut self, name: &str, x: f32, y: f32, width: f32, height: f32) {
+        self.commands.push(format!(
+            "q {width:.1} 0 0 {height:.1} {x:.1} {y:.1} cm /{name} Do Q"
+        ));
     }
 }
 
@@ -1620,6 +1646,16 @@ fn empty_as_dash(value: &str) -> &str {
     } else {
         value
     }
+}
+
+fn capitalize_first_letter(value: &str) -> String {
+    let trimmed = value.trim();
+    let mut characters = trimmed.chars();
+    let Some(first) = characters.next() else {
+        return String::new();
+    };
+
+    first.to_uppercase().collect::<String>() + characters.as_str()
 }
 
 fn escape_pdf_text(value: &str) -> String {

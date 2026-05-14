@@ -9,7 +9,7 @@ import {
 } from "../../../components/ui/table";
 import { EMPLOYEE_STATUS_OPTIONS, EMPLOYMENT_TYPE_OPTIONS } from "../constants";
 import { formatRupiah } from "../../../lib/formatters/currency";
-import { labelFor } from "../services/employee-export.service";
+import { labelFor } from "../services/employee-excel.service";
 import type { Employee } from "../types";
 
 type EmployeeTableProps = {

@@ -21,14 +21,13 @@ import { formatDisplayDateText } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import {
   listPayslipDeliveryQueue,
-  sendPayslipEmail,
   updatePayslipDeliveryStatus,
 } from "../services/payslip-delivery.service";
 import {
   createPayslipWhatsAppMessage,
   maskWhatsAppNumber,
 } from "../services/whatsapp-delivery.service";
-import type { PayslipDeliveryQueueItem, PayslipEmailStatus, PayslipWhatsappStatus } from "../types";
+import type { PayslipDeliveryQueueItem, PayslipWhatsappStatus } from "../types";
 
 type PayslipWhatsAppPanelProps = {
   session: AuthSession;
@@ -40,13 +39,6 @@ const WHATSAPP_STATUS_LABELS: Record<PayslipWhatsappStatus, string> = {
   opened: "Dibuka",
   sent_manual: "Terkirim manual",
   missing_number: "Nomor kosong",
-};
-
-const EMAIL_STATUS_LABELS: Record<PayslipEmailStatus, string> = {
-  failed: "Gagal",
-  missing_email: "Email kosong",
-  not_sent: "Belum",
-  sent: "Terkirim",
 };
 
 export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
@@ -62,11 +54,9 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
 
   const summary = useMemo(
     () => ({
-      total: queue.length,
       pdfReady: queue.filter((item) => item.pdfFilePath.trim()).length,
       whatsappSent: queue.filter((item) => getWhatsappStatus(item) === "sent_manual").length,
-      emailSent: queue.filter((item) => getEmailStatus(item) === "sent").length,
-      undelivered: queue.filter((item) => getWhatsappStatus(item) !== "sent_manual" && getEmailStatus(item) !== "sent").length,
+      undelivered: queue.filter((item) => getWhatsappStatus(item) !== "sent_manual").length,
     }),
     [queue],
   );
@@ -148,38 +138,10 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
     }
   }
 
-  async function sendEmail(item: PayslipDeliveryQueueItem) {
-    setIsUpdating(item.payslipSnapshotId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const updated = await sendPayslipEmail(item.payslipSnapshotId, session);
-      setQueue((current) =>
-        current.map((queueItem) =>
-          queueItem.payslipSnapshotId === updated.payslipSnapshotId ? updated : queueItem,
-        ),
-      );
-      setSuccessMessage(`Email slip ${item.employeeName} terkirim.`);
-    } catch (error: unknown) {
-      const message = getErrorMessage(error);
-      setErrorMessage(message);
-
-      try {
-        const refreshedQueue = await listPayslipDeliveryQueue();
-        setQueue(refreshedQueue);
-      } catch {
-        setErrorMessage(message);
-      }
-    } finally {
-      setIsUpdating(null);
-    }
-  }
-
   return (
     <FeaturePanel
       aria-label="Queue pengiriman slip gaji"
-      badge={<StatusBadge>Email otomatis + WA manual</StatusBadge>}
+      badge={<StatusBadge>WhatsApp manual</StatusBadge>}
       title="Queue Pengiriman Slip"
     >
       <PanelBody>
@@ -189,8 +151,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
         <div className="payslip-queue-summary">
           <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
           <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
-          <span>Email terkirim: <strong>{summary.emailSent}</strong></span>
-          <span>Belum terkirim via jalur apa pun: <strong>{summary.undelivered}</strong></span>
+          <span>Belum terkirim WA: <strong>{summary.undelivered}</strong></span>
           <Button onClick={() => void refreshQueue()} type="button" variant="outline">
             Refresh
           </Button>
@@ -204,11 +165,9 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
               <TableHead>Karyawan</TableHead>
               <TableHead>Periode</TableHead>
               <TableHead>Nomor WA</TableHead>
-              <TableHead>Alamat Email</TableHead>
               <TableHead>Gaji Bersih</TableHead>
               <TableHead>PDF</TableHead>
               <TableHead>WA</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Aksi</TableHead>
             </TableRow>
           </TableHeader>
@@ -221,7 +180,6 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
                 </TableCell>
                 <TableCell>{formatDisplayDateText(item.periodLabel)}</TableCell>
                 <TableCell>{item.whatsappNumber ? maskWhatsAppNumber(item.whatsappNumber) : "-"}</TableCell>
-                <TableCell>{maskEmail(item.employeeEmail)}</TableCell>
                 <TableCell>{formatRupiah(item.netPay)}</TableCell>
                 <TableCell>{fileNameFromPath(item.pdfFilePath)}</TableCell>
                 <TableCell>
@@ -229,19 +187,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
                   {item.whatsappErrorMessage ? <span className="delivery-error-note">{item.whatsappErrorMessage}</span> : null}
                 </TableCell>
                 <TableCell>
-                  <StatusBadge>{EMAIL_STATUS_LABELS[getEmailStatus(item)]}</StatusBadge>
-                  {item.emailErrorMessage ? <span className="delivery-error-note">{item.emailErrorMessage}</span> : null}
-                </TableCell>
-                <TableCell>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      disabled={isUpdating === item.payslipSnapshotId || !item.employeeEmail || !item.pdfFilePath}
-                      onClick={() => void sendEmail(item)}
-                      size="sm"
-                      type="button"
-                    >
-                      Kirim Email
-                    </Button>
                     <Button
                       disabled={isUpdating === item.payslipSnapshotId || !item.pdfFilePath}
                       onClick={() => void openPdf(item)}
@@ -258,7 +204,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
                       type="button"
                       variant="outline"
                     >
-                      Buka WA
+                      Buka WhatsApp
                     </Button>
                     <Button
                       disabled={isUpdating === item.payslipSnapshotId || !item.whatsappNumber}
@@ -267,7 +213,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
                       type="button"
                       variant="outline"
                     >
-                      Salin
+                      Salin Pesan
                     </Button>
                     <Button
                       disabled={isUpdating === item.payslipSnapshotId}
@@ -293,7 +239,7 @@ export function PayslipWhatsAppPanel({ session }: PayslipWhatsAppPanelProps) {
             ))}
             {!isLoading && queue.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9}>Belum ada slip payroll final. Finalisasi payroll dulu.</TableCell>
+                <TableCell colSpan={7}>Belum ada slip payroll final. Finalisasi payroll dulu.</TableCell>
               </TableRow>
             ) : null}
           </TableBody>
@@ -309,30 +255,12 @@ function fileNameFromPath(path: string): string {
   return normalized.split("/").pop() || "-";
 }
 
-function maskEmail(value: string): string {
-  const [localPart, domain] = value.split("@");
-
-  if (!localPart || !domain) {
-    return "-";
-  }
-
-  return `${localPart.slice(0, 2)}***@${domain}`;
-}
-
 function getWhatsappStatus(item: PayslipDeliveryQueueItem): PayslipWhatsappStatus {
   if (!item.whatsappNumber.trim() && item.whatsappStatus !== "sent_manual") {
     return "missing_number";
   }
 
   return item.whatsappStatus;
-}
-
-function getEmailStatus(item: PayslipDeliveryQueueItem): PayslipEmailStatus {
-  if (!item.employeeEmail.trim() && item.emailStatus !== "sent") {
-    return "missing_email";
-  }
-
-  return item.emailStatus;
 }
 
 function getErrorMessage(error: unknown): string {

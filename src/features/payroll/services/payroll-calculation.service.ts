@@ -33,10 +33,10 @@ export function amountToIndonesianRupiahWords(amount: number): string {
   assertValidPayrollAmount(amount, "gaji bersih");
 
   if (amount === 0) {
-    return "nol rupiah";
+    return "Nol rupiah";
   }
 
-  return `${numberToIndonesianWords(amount)} rupiah`;
+  return capitalizeFirstLetter(`${numberToIndonesianWords(amount)} rupiah`);
 }
 
 function assertValidPayrollComponents(
@@ -131,4 +131,8 @@ function numberToIndonesianWords(value: number): string {
 
 function joinWords(...parts: string[]): string {
   return parts.filter(Boolean).join(" ");
+}
+
+function capitalizeFirstLetter(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }

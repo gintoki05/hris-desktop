@@ -10,9 +10,9 @@ The user is a solo developer using AI agents. Keep changes scoped, explain trade
 
 ## Product Direction
 
-This app is an offline-first desktop HRIS Payroll system for a clinic. V1 must run on a local Windows PC without requiring a server, hosting, cloud database, or internet connection for core workflows.
+This app is an offline-first desktop HRIS Payroll system for a clinic. Core workflows must run on a local Windows PC without requiring a server, hosting, cloud database, or internet connection.
 
-Core V1 workflows must work offline:
+Core workflows must work offline:
 
 - Master company and payroll settings
 - Employee master data
@@ -26,9 +26,9 @@ WhatsApp sending may require internet, but it must remain manual. Use `wa.me` or
 
 ## Database Strategy
 
-V1 uses local SQLite for a single-PC offline deployment.
+Use local SQLite for a single-PC offline deployment.
 
-SQLite is appropriate for V1 because payroll is expected to be operated by one admin PC, without hosting or monthly server costs. Treat SQLite as a production database, not a temporary toy database.
+SQLite is appropriate because payroll is expected to be operated by one admin PC, without hosting or monthly server costs. Treat SQLite as a production database, not a temporary toy database.
 
 SQLite rules:
 
@@ -46,8 +46,8 @@ Future LAN/multi-PC support must use a client-server architecture instead of sha
 Preferred migration path:
 
 ```text
-V1: Tauri + local SQLite
-V2 LAN: Tauri or browser client + local API server + PostgreSQL
+Desktop: Tauri + local SQLite
+LAN/multi-PC: Tauri or browser client + local API server + PostgreSQL
 ```
 
 Design the TypeScript data layer so this migration remains possible:
@@ -69,7 +69,7 @@ Use the existing stack:
 - Local SQLite
 - Tailwind CSS and shadcn/ui when UI components are needed
 
-Do not introduce Next.js, NestJS, a local web server, cloud database, SaaS backend, telemetry, or sync infrastructure for V1 unless the user explicitly asks for it.
+Do not introduce Next.js, NestJS, a local web server, cloud database, SaaS backend, telemetry, or sync infrastructure unless the user explicitly asks for it.
 
 ## Command Policy
 
@@ -315,7 +315,7 @@ Table and pagination rules:
 
 ## Payslip Rules
 
-The final V1 payslip format follows `Slip Gaji Whatsapp Custom.xlsm`.
+The final payslip format follows `Slip Gaji Whatsapp Custom.xlsm`.
 
 Payslip PDF must include:
 
@@ -402,7 +402,7 @@ Treat employee, payroll, NIK, NPWP, WhatsApp numbers, attendance, and payslip da
 
 ## Production Readiness
 
-This app handles sensitive HR/payroll data and must be production-ready even for V1.
+This app handles sensitive HR/payroll data and must be production-ready.
 
 Production-ready means:
 

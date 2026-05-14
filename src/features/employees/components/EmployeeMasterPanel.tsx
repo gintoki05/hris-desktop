@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FileDown, Upload } from "lucide-react";
 import { AppNotice } from "../../../components/shared/AppNotice";
 import { FeaturePanel, PanelBody, PanelNote, StatusBadge } from "../../../components/shared/FeaturePanel";
 import { PaginationControls } from "../../../components/shared/PaginationControls";
@@ -18,9 +19,14 @@ import type { AuthSession } from "../../auth/types";
 import { getOrganizationMasterData } from "../../organization/services/organization-master.service";
 import type { OrganizationMasterData } from "../../organization/types";
 import { EmployeeForm } from "./EmployeeForm";
+import { EmployeeImportPreviewPanel } from "./EmployeeImportPreviewPanel";
 import { EmployeeTable } from "./EmployeeTable";
 import { FOLLOW_MONTHLY_SCHEDULE_LABEL } from "../constants";
-import { exportEmployeeCsv } from "../services/employee-export.service";
+import {
+  exportEmployeeImportTemplate,
+  previewEmployeeImportWorkbook,
+  type EmployeeImportPreview,
+} from "../services/employee-excel.service";
 import {
   createEmployee,
   deactivateEmployee,
@@ -49,10 +55,13 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EmployeeInput>(() => createEmptyEmployeeDraft([]));
+  const [importPreview, setImportPreview] = useState<EmployeeImportPreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedEmployee = useMemo(
     () => employees.find((employee) => employee.id === selectedEmployeeId) ?? null,
@@ -63,6 +72,15 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
     () => employees.slice((currentPage - 1) * EMPLOYEE_PAGE_SIZE, currentPage * EMPLOYEE_PAGE_SIZE),
     [currentPage, employees],
   );
+  const importSummary = useMemo(() => {
+    const rows = importPreview?.rows ?? [];
+    return {
+      createCount: rows.filter((row) => row.status === "valid" && row.action === "create").length,
+      errorCount: rows.filter((row) => row.status === "error").length,
+      updateCount: rows.filter((row) => row.status === "valid" && row.action === "update").length,
+      validCount: rows.filter((row) => row.status === "valid").length,
+    };
+  }, [importPreview]);
 
   useEffect(() => {
     let isMounted = true;
@@ -199,6 +217,82 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
     setErrorMessage(null);
   }
 
+  async function handleImportFileChange(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    setIsImporting(true);
+    setImportPreview(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const allEmployees = await listEmployees({ query: "", includeInactive: true });
+      const existingNik = new Set(allEmployees.map((employee) => normalizeKey(employee.nik)));
+      const preview = await previewEmployeeImportWorkbook(file, {
+        hasNik: (nik) => existingNik.has(normalizeKey(nik)),
+      });
+
+      setImportPreview(preview);
+      setSuccessMessage("Preview import karyawan siap dicek sebelum disimpan.");
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : "File import karyawan gagal dibaca.");
+    } finally {
+      setIsImporting(false);
+      if (importFileInputRef.current) {
+        importFileInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleSaveImportPreview() {
+    if (!canEdit || !importPreview) {
+      return;
+    }
+
+    const validRows = importPreview.rows.filter((row) => row.status === "valid" && row.input);
+    if (validRows.length === 0) {
+      setErrorMessage("Tidak ada baris valid untuk disimpan.");
+      return;
+    }
+
+    setIsImporting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const actor = toEmployeeActor(session);
+      const allEmployees = await listEmployees({ query: "", includeInactive: true });
+      const employeesByNik = new Map(allEmployees.map((employee) => [normalizeKey(employee.nik), employee]));
+
+      for (const row of validRows) {
+        const input = row.input;
+        if (!input) {
+          continue;
+        }
+
+        const existingEmployee = employeesByNik.get(normalizeKey(input.nik));
+        if (existingEmployee) {
+          await updateEmployee(existingEmployee.id, input, actor);
+        } else {
+          const createdEmployee = await createEmployee(input, actor);
+          employeesByNik.set(normalizeKey(createdEmployee.nik), createdEmployee);
+        }
+      }
+
+      await refreshEmployees(null);
+      setImportPreview(null);
+      setSuccessMessage(
+        `Import karyawan tersimpan: ${importSummary.createCount} baru, ${importSummary.updateCount} diperbarui.`,
+      );
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : "Import karyawan gagal disimpan.");
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   function handleCloseEmployeeModal() {
     if (isSaving) {
       return;
@@ -216,7 +310,7 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
     }));
   }
 
-  const disabled = !canEdit || isSaving;
+  const disabled = !canEdit || isSaving || isImporting;
 
   return (
     <FeaturePanel
@@ -249,14 +343,30 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
             />
             Tampilkan nonaktif
           </label>
-          <Button
-            disabled={employees.length === 0}
-            onClick={() => exportEmployeeCsv(employees)}
-            type="button"
-            variant="outline"
-          >
-            Export CSV Audit
+          <Button onClick={exportEmployeeImportTemplate} type="button" variant="outline">
+            <FileDown aria-hidden="true" />
+            Template Excel
           </Button>
+          {canEdit ? (
+            <>
+              <Input
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(event) => void handleImportFileChange(event.target.files?.[0])}
+                ref={importFileInputRef}
+                type="file"
+              />
+              <Button
+                disabled={disabled}
+                onClick={() => importFileInputRef.current?.click()}
+                type="button"
+                variant="outline"
+              >
+                <Upload aria-hidden="true" />
+                Import Excel
+              </Button>
+            </>
+          ) : null}
           {canEdit ? (
             <Button onClick={handleNewEmployee} type="button">
               Karyawan Baru
@@ -265,6 +375,17 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
         </div>
 
         <div className="employee-grid">
+          {importPreview ? (
+            <EmployeeImportPreviewPanel
+              disabled={disabled}
+              importPreview={importPreview}
+              importSummary={importSummary}
+              isImporting={isImporting}
+              onCancel={() => setImportPreview(null)}
+              onSave={() => void handleSaveImportPreview()}
+            />
+          ) : null}
+
           <EmployeeTable
             employees={paginatedEmployees}
             isLoading={isLoading}
@@ -379,4 +500,8 @@ function toEmployeeInput(employee: Employee): EmployeeInput {
     shiftType: employee.shiftType,
     workSchedule: employee.workSchedule,
   };
+}
+
+function normalizeKey(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
 }

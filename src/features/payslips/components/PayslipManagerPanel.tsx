@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { useEffect, useMemo, useState } from "react";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { AppNotice } from "../../../components/shared/AppNotice";
 import {
@@ -8,11 +7,9 @@ import {
   PanelNote,
   StatusBadge,
 } from "../../../components/shared/FeaturePanel";
-import { FileActionRow } from "../../../components/shared/FileActionRow";
 import { FileNameCell } from "../../../components/shared/FileNameCell";
 import { PaginationControls } from "../../../components/shared/PaginationControls";
 import { Button } from "../../../components/ui/button";
-import { Input } from "../../../components/ui/input";
 import {
   Table,
   TableBody,
@@ -23,25 +20,14 @@ import {
 } from "../../../components/ui/table";
 import { formatRupiah } from "../../../lib/formatters/currency";
 import {
-  createCurrentMonthPeriodDefaults,
   formatDisplayDateRange,
   formatDisplayDateText,
 } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
-import { listActiveEmployees } from "../../employees/services/employee.service";
 import {
-  exportPayslipImportTemplate,
-  previewPayslipWorkbook,
-  toPayslipImportSnapshots,
-} from "../services/payslip-import.service";
-import {
-  exportPayslipTemplateFile,
   generatePayslipPdfs,
   listPayslipPeriods,
   listPayslipSnapshots,
-  savePayslipImportBatch,
-  savePayslipPeriod,
-  sendPayslipManagerEmail,
   updatePayslipSnapshotSendStatus,
 } from "../services/payslip-manager.service";
 import {
@@ -49,8 +35,6 @@ import {
   maskWhatsAppNumber,
 } from "../services/whatsapp-delivery.service";
 import type {
-  PayslipImportPreview,
-  PayslipImportPreviewRow,
   PayslipManagerSnapshot,
   PayslipPeriod,
 } from "../types";
@@ -60,20 +44,10 @@ type PayslipManagerPanelProps = {
   session: AuthSession;
 };
 
-type SavedTemplateFile = {
-  name: string;
-  path: string;
-};
-
-type GeneratedPdfFolder = {
-  path: string;
-  count: number;
-};
-
 const PERIOD_STATUS_LABELS: Record<PayslipPeriod["status"], string> = {
   archived: "Diarsipkan",
   draft: "Draft",
-  imported: "Data diimport",
+  imported: "Data slip tersimpan",
   pdf_ready: "PDF siap",
 };
 
@@ -85,35 +59,16 @@ const WHATSAPP_STATUS_LABELS: Record<PayslipManagerSnapshot["whatsappStatus"], s
   sent_manual: "Terkirim manual",
 };
 
-const EMAIL_STATUS_LABELS: Record<PayslipManagerSnapshot["emailStatus"], string> = {
-  failed: "Gagal",
-  missing_email: "Email kosong",
-  not_sent: "Belum",
-  sent: "Terkirim",
-};
-
 const PERIOD_PAGE_SIZE = 5;
 
 export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const initialPeriod = useMemo(() => createCurrentMonthPeriodDefaults("Slip Gaji"), []);
   const [periods, setPeriods] = useState<PayslipPeriod[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<PayslipManagerSnapshot[]>([]);
-  const [preview, setPreview] = useState<PayslipImportPreview | null>(null);
-  const [savedTemplate, setSavedTemplate] = useState<SavedTemplateFile | null>(null);
-  const [generatedPdfFolder, setGeneratedPdfFolder] = useState<GeneratedPdfFolder | null>(null);
-  const [periodLabel, setPeriodLabel] = useState(initialPeriod.label);
-  const [startDate, setStartDate] = useState(initialPeriod.startDate);
-  const [endDate, setEndDate] = useState(initialPeriod.endDate);
   const [periodPage, setPeriodPage] = useState(1);
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(true);
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
-  const [isSavingPeriod, setIsSavingPeriod] = useState(false);
-  const [isExportingTemplate, setIsExportingTemplate] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [isReadingImport, setIsReadingImport] = useState(false);
-  const [isSavingImport, setIsSavingImport] = useState(false);
+  const [isRegeneratingPdf, setIsRegeneratingPdf] = useState(false);
   const [updatingSnapshotId, setUpdatingSnapshotId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -123,8 +78,6 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
   }, []);
 
   useEffect(() => {
-    setPreview(null);
-    setGeneratedPdfFolder(null);
     if (!selectedPeriodId) {
       setSnapshots([]);
       return;
@@ -151,28 +104,17 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
 
   const summary = useMemo(
     () => ({
-      total: snapshots.length,
       pdfReady: snapshots.filter((snapshot) => snapshot.pdfFilePath.trim()).length,
       whatsappSent: snapshots.filter((snapshot) => snapshot.whatsappStatus === "sent_manual").length,
-      emailSent: snapshots.filter((snapshot) => snapshot.emailStatus === "sent").length,
-      undelivered: snapshots.filter(
-        (snapshot) => snapshot.whatsappStatus !== "sent_manual" && snapshot.emailStatus !== "sent",
-      ).length,
+      undelivered: snapshots.filter((snapshot) => snapshot.whatsappStatus !== "sent_manual").length,
     }),
     [snapshots],
   );
-  const importSummary = useMemo(() => summarizePreview(preview), [preview]);
-  const canSaveImport = canEdit
-    && selectedPeriod !== null
-    && preview !== null
-    && importSummary.saveable > 0
-    && importSummary.error === 0
-    && !isSavingImport;
-  const canGeneratePdf = canEdit
+  const canRegeneratePdf = canEdit
     && selectedPeriod !== null
     && snapshots.length > 0
     && !isLoadingSnapshots
-    && !isGeneratingPdf;
+    && !isRegeneratingPdf;
 
   async function refreshPeriods() {
     setIsLoadingPeriods(true);
@@ -184,7 +126,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       setPeriodPage(1);
       setSelectedPeriodId((current) => current ?? nextPeriods[0]?.id ?? null);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Periode slip gagal dibaca.");
+      setErrorMessage(getErrorMessage(error, "Periode slip gagal dibaca."));
     } finally {
       setIsLoadingPeriods(false);
     }
@@ -197,147 +139,33 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     try {
       setSnapshots(await listPayslipSnapshots(periodId));
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Daftar slip karyawan gagal dibaca.");
+      setErrorMessage(getErrorMessage(error, "Daftar slip karyawan gagal dibaca."));
     } finally {
       setIsLoadingSnapshots(false);
     }
   }
 
-  async function handleSavePeriod() {
-    if (!canEdit || isSavingPeriod) {
+  async function handleRegeneratePdf() {
+    if (!selectedPeriod || !canRegeneratePdf) {
       return;
     }
 
-    setIsSavingPeriod(true);
+    setIsRegeneratingPdf(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const savedPeriod = await savePayslipPeriod(
-        {
-          label: periodLabel,
-          startDate,
-          endDate,
-        },
-        session,
-      );
-      const nextPeriods = await listPayslipPeriods();
-      setPeriods(nextPeriods);
-      setSelectedPeriodId(savedPeriod.id);
-      setSuccessMessage(`Periode ${savedPeriod.label} siap untuk import data slip.`);
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Periode slip gagal disimpan.");
-    } finally {
-      setIsSavingPeriod(false);
-    }
-  }
-
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    event.target.value = "";
-    if (!file || !selectedPeriod) {
-      return;
-    }
-
-    setIsReadingImport(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const employees = await listActiveEmployees();
-      const nextPreview = await previewPayslipWorkbook(file, employees, selectedPeriod);
-      setPreview(nextPreview);
-      if (nextPreview.rows.length === 0) {
-        setErrorMessage("Workbook terbaca, tetapi tidak ada baris slip gaji yang bisa dipreview.");
-      }
-    } catch (error: unknown) {
-      setPreview(null);
-      setErrorMessage(error instanceof Error ? error.message : "File slip gagal dibaca.");
-    } finally {
-      setIsReadingImport(false);
-    }
-  }
-
-  async function handleExportTemplate() {
-    if (!selectedPeriod || isExportingTemplate) {
-      return;
-    }
-
-    setIsExportingTemplate(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const employees = await listActiveEmployees();
-      const template = exportPayslipImportTemplate(employees, selectedPeriod);
-      const targetPath = await save({
-        defaultPath: template.fileName,
-        filters: [
-          {
-            extensions: ["xlsx"],
-            name: "Excel workbook",
-          },
-        ],
-      });
-
-      if (!targetPath) {
-        return;
-      }
-
-      const exportedPath = await exportPayslipTemplateFile(targetPath, template.bytes, session);
-      const saved = {
-        name: fileNameFromPath(exportedPath),
-        path: exportedPath,
-      };
-      setSavedTemplate(saved);
-      setSuccessMessage(
-        `Template ${selectedPeriod.label} disimpan untuk ${employees.length} karyawan aktif: ${saved.name}.`,
-      );
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Template slip gagal dibuat.");
-    } finally {
-      setIsExportingTemplate(false);
-    }
-  }
-
-  async function handleOpenSavedTemplate() {
-    if (!savedTemplate) {
-      return;
-    }
-
-    try {
-      await openPath(savedTemplate.path);
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Template yang tersimpan gagal dibuka.");
-    }
-  }
-
-  async function handleGeneratePdf() {
-    if (!selectedPeriod || !canGeneratePdf) {
-      return;
-    }
-
-    setIsGeneratingPdf(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const generatedSnapshots = await generatePayslipPdfs(selectedPeriod.id, session);
-      setSnapshots(generatedSnapshots);
-      const pdfPaths = generatedSnapshots
-        .map((snapshot) => snapshot.pdfFilePath)
-        .filter((path) => path.trim().length > 0);
-      const folderPath = pdfPaths[0] ? directoryFromPath(pdfPaths[0]) : "";
-      setGeneratedPdfFolder(folderPath ? { path: folderPath, count: pdfPaths.length } : null);
+      const regeneratedSnapshots = await generatePayslipPdfs(selectedPeriod.id, session);
+      setSnapshots(regeneratedSnapshots);
       await refreshPeriods();
       setSelectedPeriodId(selectedPeriod.id);
       setSuccessMessage(
-        `PDF ${selectedPeriod.label} dibuat untuk ${pdfPaths.length} slip karyawan.`,
+        `PDF ${selectedPeriod.label} dibuat ulang untuk ${regeneratedSnapshots.length} slip karyawan.`,
       );
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "PDF slip gagal dibuat.");
+      setErrorMessage(getErrorMessage(error, "PDF slip gagal dibuat ulang."));
     } finally {
-      setIsGeneratingPdf(false);
+      setIsRegeneratingPdf(false);
     }
   }
 
@@ -349,19 +177,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     try {
       await openPath(path);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "PDF slip gagal dibuka.");
-    }
-  }
-
-  async function handleOpenPdfFolder() {
-    if (!generatedPdfFolder?.path) {
-      return;
-    }
-
-    try {
-      await openPath(generatedPdfFolder.path);
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Folder PDF gagal dibuka.");
+      setErrorMessage(getErrorMessage(error, "PDF slip gagal dibuka."));
     }
   }
 
@@ -379,7 +195,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       setSnapshots((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setSuccessMessage(successText);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Status kirim slip gagal disimpan.");
+      setErrorMessage(getErrorMessage(error, "Status kirim slip gagal disimpan."));
     } finally {
       setUpdatingSnapshotId(null);
     }
@@ -407,7 +223,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     setSuccessMessage(null);
 
     if (!snapshot.pdfFilePath.trim()) {
-      setErrorMessage("PDF slip belum dibuat. Generate PDF dulu sebelum menyiapkan WhatsApp.");
+      setErrorMessage("PDF slip belum tersedia. Finalisasi payroll dulu untuk membuat slip PDF.");
       return;
     }
 
@@ -436,7 +252,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
         `WhatsApp ${snapshot.employeeName} dibuka, pesan disalin, dan PDF ditampilkan di Explorer.`,
       );
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Pengiriman WhatsApp gagal disiapkan.");
+      setErrorMessage(getErrorMessage(error, "Pengiriman WhatsApp gagal disiapkan."));
     }
   }
 
@@ -463,67 +279,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       await navigator.clipboard.writeText(message.message);
       setSuccessMessage(`Pesan WhatsApp ${snapshot.employeeName} disalin.`);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Pesan WhatsApp gagal disalin.");
-    }
-  }
-
-  async function handleSendEmail(snapshot: PayslipManagerSnapshot) {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    if (!snapshot.pdfFilePath.trim()) {
-      setErrorMessage("PDF slip belum dibuat. Generate PDF dulu sebelum kirim email.");
-      return;
-    }
-
-    setUpdatingSnapshotId(snapshot.id);
-    try {
-      const updated = await sendPayslipManagerEmail(snapshot.id, session);
-      setSnapshots((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setSuccessMessage(`Email slip ${snapshot.employeeName} terkirim dengan lampiran PDF.`);
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Email slip gagal dikirim.");
-      await refreshSnapshots(snapshot.periodId);
-    } finally {
-      setUpdatingSnapshotId(null);
-    }
-  }
-
-  async function handleSaveImport() {
-    if (!preview || !selectedPeriod || !canSaveImport) {
-      return;
-    }
-
-    setIsSavingImport(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const snapshotsToSave = toPayslipImportSnapshots(preview);
-      const batch = await savePayslipImportBatch(
-        {
-          periodId: selectedPeriod.id,
-          sourceFileName: preview.sourceFileName,
-          totalRows: preview.rows.length,
-          validRows: snapshotsToSave.length,
-          errorRows: importSummary.error,
-          notes: importSummary.warning > 0
-            ? "Import tersimpan dengan warning. Periksa nomor WhatsApp atau mapping pegawai."
-            : "",
-          snapshots: snapshotsToSave,
-        },
-        session,
-      );
-      setSuccessMessage(
-        `Import ${batch.sourceFileName} tersimpan: ${batch.validRows} slip karyawan.`,
-      );
-      setPreview(null);
-      await refreshPeriods();
-      await refreshSnapshots(selectedPeriod.id);
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : "Import slip gagal disimpan.");
-    } finally {
-      setIsSavingImport(false);
+      setErrorMessage(getErrorMessage(error, "Pesan WhatsApp gagal disalin."));
     }
   }
 
@@ -540,53 +296,20 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
         {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
         {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
-        <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.4fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_auto_auto] md:items-end">
-          <label>
-            Label periode
-            <Input
-              disabled={!canEdit || isSavingPeriod}
-              onChange={(event) => setPeriodLabel(event.target.value)}
-              value={periodLabel}
-            />
-          </label>
-          <label>
-            Tanggal mulai
-            <Input
-              disabled={!canEdit || isSavingPeriod}
-              onChange={(event) => setStartDate(event.target.value)}
-              type="date"
-              value={startDate}
-            />
-          </label>
-          <label>
-            Tanggal selesai
-            <Input
-              disabled={!canEdit || isSavingPeriod}
-              onChange={(event) => setEndDate(event.target.value)}
-              type="date"
-              value={endDate}
-            />
-          </label>
-          <Button disabled={!canEdit || isSavingPeriod} onClick={handleSavePeriod} type="button">
-            {isSavingPeriod ? "Menyimpan..." : "Simpan Periode"}
-          </Button>
-          <Button disabled={isLoadingPeriods} onClick={() => void refreshPeriods()} type="button" variant="outline">
-            Refresh
-          </Button>
-        </div>
-
         <div className="payslip-manager-content">
           <div className="min-w-0 overflow-hidden rounded-lg border bg-background p-4" aria-label="Daftar periode slip">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Periode Slip</h3>
-                <p className="mt-1 text-xs text-muted-foreground">Terbaru diurutkan paling atas.</p>
+                <h3 className="text-sm font-semibold text-foreground">Periode Payroll Final</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Dibuat otomatis saat payroll difinalisasi.</p>
               </div>
-              <span className="text-sm text-muted-foreground">{periods.length} periode</span>
+              <Button disabled={isLoadingPeriods} onClick={() => void refreshPeriods()} size="sm" type="button" variant="outline">
+                Refresh
+              </Button>
             </div>
             {isLoadingPeriods ? <PanelNote>Membaca periode slip...</PanelNote> : null}
             {!isLoadingPeriods && periods.length === 0 ? (
-              <PanelNote>Belum ada periode slip. Buat periode sebelum import Excel.</PanelNote>
+              <PanelNote>Belum ada payroll final. Finalisasi payroll dulu untuk membuat slip PDF.</PanelNote>
             ) : null}
             <div className="grid gap-2">
               {paginatedPeriods.map((period) => {
@@ -638,129 +361,26 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             <div>
               <h3 className="text-sm font-semibold text-foreground">Daftar Slip Karyawan</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Data di sini hanya berasal dari periode slip yang dipilih.
+                Data di sini berasal dari snapshot payroll final.
               </p>
             </div>
             <StatusBadge>{selectedPeriod?.label ?? "Pilih periode"}</StatusBadge>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="attendance-import-file-field">
-              <span className="attendance-import-label">File Excel Slip Gaji</span>
-              <Input
-                accept=".xls,.xlsx,.xlsm"
-                className="attendance-import-file-input"
-                disabled={!canEdit || !selectedPeriod || isReadingImport || isSavingImport}
-                onChange={handleFileChange}
-                ref={fileInputRef}
-                type="file"
-              />
-              <div className="attendance-import-file-control">
-                <Button
-                  disabled={!canEdit || !selectedPeriod || isReadingImport || isSavingImport}
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                  variant="outline"
-                >
-                  {isReadingImport ? "Membaca..." : "Pilih File"}
-                </Button>
-                <span data-empty={!preview}>{preview?.sourceFileName ?? "Belum ada file dipilih"}</span>
-              </div>
-            </div>
-            <Button
-              disabled={!canEdit || !selectedPeriod || isExportingTemplate}
-              onClick={handleExportTemplate}
-              type="button"
-              variant="outline"
-            >
-              {isExportingTemplate ? "Membuat..." : "Download Template"}
-            </Button>
-            <Button disabled={!canSaveImport} onClick={handleSaveImport} type="button">
-              {isSavingImport ? "Menyimpan..." : "Simpan Import"}
-            </Button>
-            <Button disabled={!canGeneratePdf} onClick={handleGeneratePdf} type="button">
-              {isGeneratingPdf ? "Membuat PDF..." : "Generate PDF"}
-            </Button>
-          </div>
-
-          {preview ? (
-            <div className="attendance-import-content">
-              <div className="attendance-import-summary">
-                <span>File: {preview.sourceFileName}</span>
-                <span>Sheet: {preview.sheetName}</span>
-                <strong>
-                  {importSummary.valid} valid, {importSummary.warning} warning, {importSummary.error} error
-                </strong>
-              </div>
-
-              {importSummary.error > 0 ? (
-                <PanelNote tone="warning">
-                  Perbaiki file import dulu. Slip karyawan belum bisa disimpan selama masih ada baris error.
-                </PanelNote>
-              ) : null}
-
-              <div className="overflow-x-auto rounded-lg border bg-background">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Row</TableHead>
-                      <TableHead>Karyawan</TableHead>
-                      <TableHead>Match</TableHead>
-                      <TableHead>WhatsApp</TableHead>
-                      <TableHead>Pendapatan</TableHead>
-                      <TableHead>Potongan</TableHead>
-                      <TableHead>Gaji Bersih</TableHead>
-                      <TableHead>Catatan</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.rows.map((row) => (
-                      <TableRow data-status={row.status} key={`${row.rowNumber}-${row.employeeName}`}>
-                        <TableCell>{formatPreviewStatus(row.status)}</TableCell>
-                        <TableCell>{row.rowNumber}</TableCell>
-                        <TableCell>
-                          <strong className="block font-semibold">{row.employeeName}</strong>
-                          <span className="block text-muted-foreground">{row.employeeNik || "-"} | {row.employeePosition || "-"}</span>
-                        </TableCell>
-                        <TableCell>{row.matchedEmployeeName || "-"}</TableCell>
-                        <TableCell>{row.whatsappNumber || "-"}</TableCell>
-                        <TableCell>{formatRupiah(row.grossPay)}</TableCell>
-                        <TableCell>{formatRupiah(row.totalDeductions)}</TableCell>
-                        <TableCell>{formatRupiah(row.netPay)}</TableCell>
-                        <TableCell>{row.errorMessage || "-"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          ) : null}
-
-          {savedTemplate ? (
-            <FileActionRow
-              actionLabel="Buka File"
-              label="Template terakhir"
-              onAction={handleOpenSavedTemplate}
-              value={savedTemplate.name}
-            />
-          ) : null}
-
-          {generatedPdfFolder ? (
-            <FileActionRow
-              actionLabel="Buka Folder"
-              label="Folder PDF terakhir"
-              onAction={handleOpenPdfFolder}
-              value={`${generatedPdfFolder.count} file`}
-            />
-          ) : null}
-
           <div className="payslip-status-summary">
             <span>Periode: <strong>{selectedPeriod?.label ?? "-"}</strong></span>
             <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
             <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
-            <span>Email terkirim: <strong>{summary.emailSent}</strong></span>
-            <span>Belum terkirim via jalur apa pun: <strong>{summary.undelivered}</strong></span>
+            <span>Belum terkirim WA: <strong>{summary.undelivered}</strong></span>
+            <Button
+              disabled={!canRegeneratePdf}
+              onClick={() => void handleRegeneratePdf()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {isRegeneratingPdf ? "Membuat ulang..." : "Buat Ulang PDF Periode"}
+            </Button>
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-background">
@@ -773,7 +393,6 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                   <TableHead>Gaji Bersih</TableHead>
                   <TableHead>PDF</TableHead>
                   <TableHead>WA</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -791,21 +410,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                       <StatusBadge>{WHATSAPP_STATUS_LABELS[snapshot.whatsappStatus]}</StatusBadge>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge>{EMAIL_STATUS_LABELS[snapshot.emailStatus]}</StatusBadge>
-                      {snapshot.emailErrorMessage ? (
-                        <span className="delivery-error-note">{snapshot.emailErrorMessage}</span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          disabled={updatingSnapshotId === snapshot.id || !snapshot.pdfFilePath.trim()}
-                          onClick={() => void handleSendEmail(snapshot)}
-                          size="sm"
-                          type="button"
-                        >
-                          Kirim Email
-                        </Button>
                         <Button
                           disabled={updatingSnapshotId === snapshot.id || !snapshot.pdfFilePath.trim()}
                           onClick={() => void handleOpenPdf(snapshot.pdfFilePath)}
@@ -822,7 +427,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                           type="button"
                           variant="outline"
                         >
-                          Siapkan Kirim
+                          Buka WhatsApp
                         </Button>
                         <Button
                           disabled={updatingSnapshotId === snapshot.id || snapshot.sendStatus === "not_generated"}
@@ -831,7 +436,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                           type="button"
                           variant="outline"
                         >
-                          Salin
+                          Salin Pesan
                         </Button>
                         <Button
                           disabled={updatingSnapshotId === snapshot.id || snapshot.sendStatus === "not_generated"}
@@ -867,12 +472,12 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                 ))}
                 {!isLoadingSnapshots && selectedPeriod && snapshots.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7}>Belum ada slip karyawan. Langkah berikutnya adalah import Excel data slip.</TableCell>
+                    <TableCell colSpan={6}>Belum ada slip karyawan untuk periode ini. Finalisasi payroll dulu.</TableCell>
                   </TableRow>
                 ) : null}
                 {!isLoadingSnapshots && !selectedPeriod ? (
                   <TableRow>
-                    <TableCell colSpan={7}>Pilih atau buat periode slip terlebih dahulu.</TableCell>
+                    <TableCell colSpan={6}>Pilih periode payroll final terlebih dahulu.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -883,28 +488,6 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       </PanelBody>
     </FeaturePanel>
   );
-}
-
-function summarizePreview(preview: PayslipImportPreview | null) {
-  const rows = preview?.rows ?? [];
-  const valid = rows.filter((row) => row.status === "valid").length;
-  const warning = rows.filter((row) => row.status === "warning").length;
-  const error = rows.filter((row) => row.status === "error").length;
-
-  return {
-    valid,
-    warning,
-    error,
-    saveable: valid + warning,
-  };
-}
-
-function formatPreviewStatus(status: PayslipImportPreviewRow["status"]): string {
-  if (status === "warning") {
-    return "Warning";
-  }
-
-  return status === "valid" ? "Valid" : "Error";
 }
 
 function fileNameFromPath(path: string): string {
@@ -923,4 +506,16 @@ function directoryFromPath(path: string): string {
 
   const slashIndex = Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"));
   return slashIndex > 0 ? path.slice(0, slashIndex) : "";
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return fallback;
 }

@@ -17,7 +17,7 @@ type MasterSettingsPanelProps = {
 };
 
 const LOGO_MAX_SIZE_BYTES = 512 * 1024;
-const LOGO_ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+const LOGO_ACCEPTED_TYPES = ["image/png", "image/jpeg"] as const;
 
 export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: MasterSettingsPanelProps) {
   const [settings, setSettings] = useState<MasterSettings | null>(null);
@@ -116,7 +116,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
     setSuccessMessage(null);
 
     if (!LOGO_ACCEPTED_TYPES.includes(file.type as (typeof LOGO_ACCEPTED_TYPES)[number])) {
-      setErrorMessage("Logo harus berupa file PNG, JPG, atau WebP.");
+      setErrorMessage("Logo harus berupa file PNG atau JPG.");
       return;
     }
 
@@ -196,7 +196,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                       Pilih Logo
                       <input
                         className="sr-only"
-                        accept="image/png,image/jpeg,image/webp"
+                        accept="image/png,image/jpeg"
                         disabled={disabled}
                         onChange={handleLogoChange}
                         type="file"
@@ -212,7 +212,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                     </Button>
                   </div>
                 </div>
-                <span className="field-help">PNG, JPG, atau WebP. Maksimal 512 KB.</span>
+                <span className="field-help">PNG atau JPG. Maksimal 512 KB.</span>
               </div>
               <label>
                 Alamat
