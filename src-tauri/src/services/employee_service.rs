@@ -21,6 +21,7 @@ pub struct Employee {
     pub position: String,
     pub status: String,
     pub employment_type: String,
+    pub salary_amount: i64,
     pub payment_method: String,
     pub pph21_enabled: bool,
     pub shift_type: String,
@@ -55,6 +56,7 @@ pub struct EmployeeInput {
     pub position: String,
     pub status: String,
     pub employment_type: String,
+    pub salary_amount: i64,
     pub payment_method: String,
     pub pph21_enabled: bool,
     pub shift_type: String,
@@ -75,7 +77,7 @@ pub fn list_employees(
         SELECT
             id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
             position, status, employment_type, payment_method,
-            pph21_enabled, shift_type, work_schedule, updated_at
+            salary_amount, pph21_enabled, shift_type, work_schedule, updated_at
         FROM employees
         WHERE ?1 = ''
             OR lower(name) LIKE ?2
@@ -89,7 +91,7 @@ pub fn list_employees(
         SELECT
             id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
             position, status, employment_type, payment_method,
-            pph21_enabled, shift_type, work_schedule, updated_at
+            salary_amount, pph21_enabled, shift_type, work_schedule, updated_at
         FROM employees
         WHERE status = 'active'
             AND (
@@ -131,13 +133,13 @@ pub fn create_employee(
         "
         INSERT INTO employees (
             id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
-            position, status, employment_type, payment_method,
+            position, status, employment_type, salary_amount, payment_method,
             pph21_enabled, shift_type, work_schedule, created_at, updated_at
         )
         VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
             ?11, ?12, ?13, ?14,
-            ?15, ?16, ?17, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+            ?15, ?16, ?17, ?18, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         )
         ",
         params![
@@ -154,6 +156,7 @@ pub fn create_employee(
             &employee.position,
             &employee.status,
             &employee.employment_type,
+            employee.salary_amount,
             &employee.payment_method,
             if employee.pph21_enabled { 1 } else { 0 },
             &employee.shift_type,
@@ -199,11 +202,12 @@ pub fn update_employee(
             status = ?11,
             employment_type = ?12,
             payment_method = ?13,
-            pph21_enabled = ?14,
-            shift_type = ?15,
-            work_schedule = ?16,
+            salary_amount = ?14,
+            pph21_enabled = ?15,
+            shift_type = ?16,
+            work_schedule = ?17,
             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-        WHERE id = ?17
+        WHERE id = ?18
         ",
         params![
             &employee.nik,
@@ -219,6 +223,7 @@ pub fn update_employee(
             &employee.status,
             &employee.employment_type,
             &employee.payment_method,
+            employee.salary_amount,
             if employee.pph21_enabled { 1 } else { 0 },
             &employee.shift_type,
             &employee.work_schedule,
@@ -266,9 +271,9 @@ fn get_employee_by_id(app: &AppHandle, id: &str) -> Result<Option<Employee>, App
         .query_row(
             "
             SELECT
-                id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
-                position, status, employment_type, payment_method,
-                pph21_enabled, shift_type, work_schedule, updated_at
+            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            position, status, employment_type, payment_method,
+            salary_amount, pph21_enabled, shift_type, work_schedule, updated_at
             FROM employees
             WHERE id = ?1
             ",
@@ -280,7 +285,7 @@ fn get_employee_by_id(app: &AppHandle, id: &str) -> Result<Option<Employee>, App
 }
 
 fn employee_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Employee> {
-    let pph21_enabled: i32 = row.get(14)?;
+    let pph21_enabled: i32 = row.get(15)?;
 
     Ok(Employee {
         id: row.get(0)?,
@@ -297,10 +302,11 @@ fn employee_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Employee> {
         status: row.get(11)?,
         employment_type: row.get(12)?,
         payment_method: row.get(13)?,
+        salary_amount: row.get(14)?,
         pph21_enabled: pph21_enabled == 1,
-        shift_type: row.get(15)?,
-        work_schedule: row.get(16)?,
-        updated_at: row.get(17)?,
+        shift_type: row.get(16)?,
+        work_schedule: row.get(17)?,
+        updated_at: row.get(18)?,
     })
 }
 
@@ -319,6 +325,7 @@ fn normalize_employee_input(id: String, input: EmployeeInput) -> Result<Employee
         position: input.position.trim().to_string(),
         status: input.status.trim().to_string(),
         employment_type: input.employment_type.trim().to_string(),
+        salary_amount: input.salary_amount,
         payment_method: input.payment_method.trim().to_string(),
         pph21_enabled: input.pph21_enabled,
         shift_type: input.shift_type.trim().to_string(),
@@ -365,6 +372,12 @@ fn validate_employee(employee: &Employee) -> Result<(), AppError> {
         "monthly" | "weekly" | "daily"
     ) {
         return Err(AppError::Database("sistem gaji tidak valid".to_string()));
+    }
+
+    if employee.salary_amount < 0 {
+        return Err(AppError::Database(
+            "gaji pokok default tidak boleh negatif".to_string(),
+        ));
     }
 
     if !matches!(

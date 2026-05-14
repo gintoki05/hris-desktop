@@ -21,6 +21,7 @@ export type Employee = {
   dependents: number;
   department: string;
   employmentType: EmploymentType;
+  salaryAmount: number;
   paymentMethod: SalaryPaymentMethod;
   pph21Enabled: boolean;
   shiftType: ShiftType;
@@ -42,6 +43,7 @@ export type EmployeeInput = {
   position: string;
   status: EmployeeStatus;
   employmentType: EmploymentType;
+  salaryAmount: number;
   paymentMethod: SalaryPaymentMethod;
   pph21Enabled: boolean;
   shiftType: ShiftType;

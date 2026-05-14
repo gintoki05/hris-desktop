@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "../../../components/ui/button";
+import { Checkbox } from "../../../components/ui/checkbox";
+import { Input } from "../../../components/ui/input";
 import { AppNotice } from "../../../components/shared/AppNotice";
 import { FormattedAmountInput } from "../../../components/shared/FormattedAmountInput";
 import { formatRupiah } from "../../../lib/formatters/currency";
@@ -12,6 +15,7 @@ import {
   getManualPayrollDraft,
   saveManualPayrollDraftInput,
 } from "../services/manual-payroll.service";
+import { BASE_SALARY_COMPONENT_NAME, DEDUCTION_COMPONENT_NAMES, INCOME_COMPONENT_NAMES } from "../constants";
 import type { PayrollComponentAmount } from "../types";
 
 type ManualPayrollPanelProps = {
@@ -26,24 +30,6 @@ type PayrollRowDraft = {
 };
 
 type PayrollPeriodStatus = "new" | "draft" | "finalized";
-
-const INCOME_COMPONENTS = [
-  "Gaji Pokok",
-  "Tunjangan Kinerja",
-  "Tunjangan Tidak Tetap",
-  "Jasa Tindakan",
-  "Uang Makan",
-  "Lembur",
-] as const;
-
-const DEDUCTION_COMPONENTS = [
-  "Pajak PPh21",
-  "BPJS Kesehatan",
-  "BPJS TK",
-  "Potongan Kasbon",
-  "Potongan Absen",
-  "Potongan Terlambat",
-] as const;
 
 export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -304,31 +290,30 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
       <div className="payroll-toolbar">
         <label>
           Label periode
-          <input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} />
+          <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} />
         </label>
         <label>
           Tanggal mulai
-          <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
         </label>
         <label>
           Tanggal selesai
-          <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
-        <button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleSaveDraft()} type="button">
+        <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleSaveDraft()} type="button" variant="outline">
           {isSaving ? "Menyimpan..." : "Simpan Draft"}
-        </button>
-        <button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleFinalize()} type="button">
+        </Button>
+        <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleFinalize()} type="button">
           {isSaving ? "Finalisasi..." : "Finalisasi Payroll"}
-        </button>
+        </Button>
       </div>
 
       <div className="payroll-summary">
         <label className="inline-check payroll-select-all">
-          <input
+          <Checkbox
             checked={allEmployeesSelected}
             disabled={!canEditPayroll || isSaving || employees.length === 0}
-            onChange={(event) => updateAllSelected(event.target.checked)}
-            type="checkbox"
+            onCheckedChange={(checked) => updateAllSelected(checked === true)}
           />
           Pilih semua karyawan
         </label>
@@ -344,8 +329,8 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
             <tr>
               <th>Pilih</th>
               <th>Karyawan</th>
-              {INCOME_COMPONENTS.map((component) => <th key={component}>{component}</th>)}
-              {DEDUCTION_COMPONENTS.map((component) => <th key={component}>{component}</th>)}
+              {INCOME_COMPONENT_NAMES.map((component) => <th key={component}>{component}</th>)}
+              {DEDUCTION_COMPONENT_NAMES.map((component) => <th key={component}>{component}</th>)}
               <th>Gaji Bersih</th>
             </tr>
           </thead>
@@ -357,18 +342,17 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
               return (
                 <tr key={employee.id}>
                   <td>
-                    <input
+                    <Checkbox
                       checked={row?.selected ?? false}
                       disabled={!canEditPayroll || isSaving}
-                      onChange={(event) => updateSelected(employee.id, event.target.checked)}
-                      type="checkbox"
+                      onCheckedChange={(checked) => updateSelected(employee.id, checked === true)}
                     />
                   </td>
                   <td>
                     <strong>{employee.name}</strong>
                     <span>{employee.nik}</span>
                   </td>
-                  {INCOME_COMPONENTS.map((component) => (
+                  {INCOME_COMPONENT_NAMES.map((component) => (
                     <td key={component}>
                       <FormattedAmountInput
                         disabled={!canEditPayroll || isSaving}
@@ -377,7 +361,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
                       />
                     </td>
                   ))}
-                  {DEDUCTION_COMPONENTS.map((component) => (
+                  {DEDUCTION_COMPONENT_NAMES.map((component) => (
                     <td key={component}>
                       <FormattedAmountInput
                         disabled={!canEditPayroll || isSaving}
@@ -424,8 +408,8 @@ function applyDraftRows(
     if (!nextRows[item.employeeId]) {
       nextRows[item.employeeId] = {
         selected: true,
-        income: Object.fromEntries(INCOME_COMPONENTS.map((name) => [name, 0])),
-        deductions: Object.fromEntries(DEDUCTION_COMPONENTS.map((name) => [name, 0])),
+        income: createEmptyIncome(),
+        deductions: Object.fromEntries(DEDUCTION_COMPONENT_NAMES.map((name) => [name, 0])),
       };
     }
 
@@ -466,9 +450,22 @@ function initializeRows(
       employee.id,
       currentRows[employee.id] ?? {
         selected: true,
-        income: Object.fromEntries(INCOME_COMPONENTS.map((name) => [name, 0])),
-        deductions: Object.fromEntries(DEDUCTION_COMPONENTS.map((name) => [name, 0])),
+        income: createDefaultIncome(employee),
+        deductions: Object.fromEntries(DEDUCTION_COMPONENT_NAMES.map((name) => [name, 0])),
       },
+    ]),
+  );
+}
+
+function createEmptyIncome(): Record<string, number> {
+  return Object.fromEntries(INCOME_COMPONENT_NAMES.map((name) => [name, 0]));
+}
+
+function createDefaultIncome(employee: Employee): Record<string, number> {
+  return Object.fromEntries(
+    INCOME_COMPONENT_NAMES.map((name) => [
+      name,
+      name === BASE_SALARY_COMPONENT_NAME ? employee.salaryAmount : 0,
     ]),
   );
 }

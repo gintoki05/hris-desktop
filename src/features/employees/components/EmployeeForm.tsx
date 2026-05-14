@@ -1,4 +1,5 @@
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
+import { FormattedAmountInput } from "../../../components/shared/FormattedAmountInput";
 import type { WorkShift } from "../../attendance/types";
 import type { OrganizationReferenceItem } from "../../organization/types";
 import {
@@ -228,6 +229,23 @@ export function EmployeeForm({
               ))}
             </select>
           </label>
+        </div>
+
+        <div className="settings-two-columns">
+          <label>
+            Gaji pokok default
+            <FormattedAmountInput
+              disabled={disabled}
+              onChange={(value) => onUpdateDraft("salaryAmount", value)}
+              value={draft.salaryAmount}
+            />
+            <span className="field-help">
+              Dipakai otomatis sebagai Gaji Pokok saat membuat draft payroll baru.
+            </span>
+          </label>
+          <span className="field-help employee-field-note">
+            Nilai ini hanya default master. Slip periode final tetap memakai snapshot payroll.
+          </span>
         </div>
 
         <div className="settings-two-columns">

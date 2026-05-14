@@ -1,4 +1,4 @@
-import { calculatePayrollSnapshot } from "./payroll-calculation.service";
+import { amountToIndonesianRupiahWords, calculatePayrollSnapshot } from "./payroll-calculation.service";
 import {
   finalizeManualPayroll as finalizeManualPayrollWithRepository,
   getFinalizedManualPayroll,
@@ -29,6 +29,7 @@ export type ManualPayrollDraft = {
 export async function finalizeManualPayrollDraft(
   draft: ManualPayrollDraft,
 ): Promise<FinalizedPayrollRun> {
+  validateManualPayrollDraft(draft);
   const items = draft.items.map(toFinalizeItem);
 
   return finalizeManualPayrollWithRepository({
@@ -40,6 +41,8 @@ export async function finalizeManualPayrollDraft(
 }
 
 export async function saveManualPayrollDraftInput(draft: ManualPayrollDraft) {
+  validateManualPayrollDraft(draft);
+
   return saveManualPayrollDraft({
     payrollRunId: draft.payrollRunId,
     period: draft.period,
@@ -49,6 +52,33 @@ export async function saveManualPayrollDraftInput(draft: ManualPayrollDraft) {
 }
 
 export { getFinalizedManualPayroll, getManualPayrollDraft };
+
+function validateManualPayrollDraft(draft: ManualPayrollDraft): void {
+  if (!draft.period.label.trim()) {
+    throw new Error("Label periode payroll wajib diisi.");
+  }
+
+  if (!draft.period.startDate || !draft.period.endDate) {
+    throw new Error("Tanggal mulai dan selesai payroll wajib diisi.");
+  }
+
+  if (draft.period.startDate > draft.period.endDate) {
+    throw new Error("Tanggal mulai payroll tidak boleh setelah tanggal selesai.");
+  }
+
+  const uniqueEmployeeIds = new Set<string>();
+  for (const item of draft.items) {
+    if (!item.employeeId.trim()) {
+      throw new Error("Karyawan payroll wajib dipilih.");
+    }
+
+    if (uniqueEmployeeIds.has(item.employeeId)) {
+      throw new Error("Karyawan yang sama tidak boleh masuk dua kali dalam satu payroll.");
+    }
+
+    uniqueEmployeeIds.add(item.employeeId);
+  }
+}
 
 function toFinalizeItem(item: ManualPayrollDraftItem): ManualPayrollEmployeeInput {
   const payroll = calculatePayrollSnapshot({
@@ -72,6 +102,6 @@ function toFinalizeItem(item: ManualPayrollDraftItem): ManualPayrollEmployeeInpu
     grossPay: payroll.grossPay,
     totalDeductions: payroll.totalDeductions,
     netPay: payroll.netPay,
-    amountInWords: `${payroll.netPay.toLocaleString("id-ID")} rupiah`,
+    amountInWords: amountToIndonesianRupiahWords(payroll.netPay),
   };
 }

@@ -26,6 +26,7 @@ type EmployeeDto = {
   position: string;
   status: EmployeeStatus;
   employment_type: EmploymentType;
+  salary_amount: number;
   payment_method: SalaryPaymentMethod;
   pph21_enabled: boolean;
   shift_type: ShiftType;
@@ -126,6 +127,7 @@ function toEmployee(dto: EmployeeDto): Employee {
     position: dto.position,
     status: dto.status,
     employmentType: dto.employment_type,
+    salaryAmount: dto.salary_amount,
     paymentMethod: dto.payment_method,
     pph21Enabled: dto.pph21_enabled,
     shiftType: dto.shift_type,
@@ -148,6 +150,7 @@ function toEmployeeInputDto(input: EmployeeInput): EmployeeInputDto {
     position: input.position,
     status: input.status,
     employment_type: input.employmentType,
+    salary_amount: input.salaryAmount,
     payment_method: input.paymentMethod,
     pph21_enabled: input.pph21Enabled,
     shift_type: input.shiftType,

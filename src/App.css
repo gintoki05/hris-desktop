@@ -1598,6 +1598,12 @@ h1 {
   min-height: 40px;
 }
 
+.payroll-toolbar button[data-slot="button"][data-variant="outline"] {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: var(--app-muted-strong);
+}
+
 .payroll-toolbar button:disabled,
 .payslip-queue-summary button:disabled,
 .payslip-queue-actions button:disabled {
@@ -1630,6 +1636,11 @@ h1 {
 
 .payroll-select-all {
   margin-right: 4px;
+}
+
+.payroll-summary [data-slot="checkbox"] {
+  border-color: #94a3b8;
+  box-shadow: 0 1px 1px rgb(15 23 42 / 0.04);
 }
 
 .payroll-table-wrap,
@@ -1666,6 +1677,30 @@ h1 {
   font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
+}
+
+.payroll-table th:first-child,
+.payroll-table td:first-child {
+  text-align: center;
+  width: 64px;
+}
+
+.payroll-table [data-slot="checkbox"] {
+  border-color: #94a3b8;
+  box-shadow: 0 1px 1px rgb(15 23 42 / 0.04);
+  margin: 0 auto;
+}
+
+.payroll-table [data-slot="checkbox"][data-state="checked"],
+.payroll-summary [data-slot="checkbox"][data-state="checked"] {
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+  color: #ffffff;
+}
+
+.payroll-table [data-slot="checkbox"]:hover:not(:disabled),
+.payroll-summary [data-slot="checkbox"]:hover:not(:disabled) {
+  border-color: var(--app-primary);
 }
 
 .payroll-table td strong,

@@ -1,4 +1,5 @@
 import { EMPLOYEE_STATUS_OPTIONS, EMPLOYMENT_TYPE_OPTIONS } from "../constants";
+import { formatRupiah } from "../../../lib/formatters/currency";
 import { labelFor } from "../services/employee-export.service";
 import type { Employee } from "../types";
 
@@ -27,6 +28,7 @@ export function EmployeeTable({
             <th>Departemen</th>
             <th>Jabatan</th>
             <th>Sistem</th>
+            <th>Gaji Pokok</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -46,6 +48,7 @@ export function EmployeeTable({
               <td>{employee.department}</td>
               <td>{employee.position}</td>
               <td>{labelFor(employee.employmentType, EMPLOYMENT_TYPE_OPTIONS)}</td>
+              <td>{formatRupiah(employee.salaryAmount)}</td>
               <td>
                 <span className="status-pill">
                   {labelFor(employee.status, EMPLOYEE_STATUS_OPTIONS)}
@@ -55,7 +58,7 @@ export function EmployeeTable({
           ))}
           {!isLoading && employees.length === 0 ? (
             <tr>
-              <td colSpan={7}>Belum ada data karyawan sesuai filter.</td>
+              <td colSpan={8}>Belum ada data karyawan sesuai filter.</td>
             </tr>
           ) : null}
         </tbody>
