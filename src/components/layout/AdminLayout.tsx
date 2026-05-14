@@ -19,6 +19,8 @@ export type AdminPage =
 
 type AdminLayoutProps = PropsWithChildren<{
   activePage: AdminPage;
+  companyName: string;
+  companyLogoDataUrl: string;
   session: AuthSession;
   can: (permission: AuthPermission) => boolean;
   onLogout: () => Promise<void>;
@@ -39,6 +41,8 @@ export function AdminLayout({
   activePage,
   can,
   children,
+  companyLogoDataUrl,
+  companyName,
   onLogout,
   onNavigate,
   session,
@@ -47,8 +51,17 @@ export function AdminLayout({
     <div className="admin-layout">
       <aside className="sidebar">
         <div className="brand">
-          <strong>HRIS Payroll</strong>
-          <span>Klinik Permata Medika</span>
+          <span className="brand-mark" aria-hidden="true">
+            {companyLogoDataUrl ? (
+              <img alt="" src={companyLogoDataUrl} />
+            ) : (
+              "KP"
+            )}
+          </span>
+          <span className="brand-copy">
+            <strong>HRIS Payroll</strong>
+            <span>{companyName}</span>
+          </span>
         </div>
         <nav className="nav-list" aria-label="Navigasi utama">
           {navItems.map((item) => (

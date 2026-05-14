@@ -1,25 +1,20 @@
-import { useEffect, useState } from "react";
+import { type ChangeEvent, useEffect, useState } from "react";
+import { AppNotice } from "../../../components/shared/AppNotice";
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import { getMasterSettings, updateMasterSettings } from "../services/master-settings.service";
-import type { MasterSettings, PayrollPaydayType, PayrollWeekday } from "../types";
+import type { MasterSettings } from "../types";
 
 type MasterSettingsPanelProps = {
   canEdit: boolean;
+  onSettingsSaved?: (settings: MasterSettings) => void;
   session: AuthSession;
 };
 
-const weekdayOptions: Array<{ value: PayrollWeekday; label: string }> = [
-  { value: "monday", label: "Senin" },
-  { value: "tuesday", label: "Selasa" },
-  { value: "wednesday", label: "Rabu" },
-  { value: "thursday", label: "Kamis" },
-  { value: "friday", label: "Jumat" },
-  { value: "saturday", label: "Sabtu" },
-  { value: "sunday", label: "Minggu" },
-];
+const LOGO_MAX_SIZE_BYTES = 512 * 1024;
+const LOGO_ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 
-export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelProps) {
+export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: MasterSettingsPanelProps) {
   const [settings, setSettings] = useState<MasterSettings | null>(null);
   const [draft, setDraft] = useState<MasterSettings | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -71,6 +66,7 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
       const savedSettings = await updateMasterSettings({
         company: draft.company,
         payroll: draft.payroll,
+        emailDelivery: draft.emailDelivery,
         actor: {
           userId: session.user.id,
           displayName: session.user.displayName,
@@ -80,6 +76,7 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
 
       setSettings(savedSettings);
       setDraft(savedSettings);
+      onSettingsSaved?.(savedSettings);
       setSuccessMessage("Setting master tersimpan dan audit perubahan tercatat.");
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Setting master gagal disimpan.");
@@ -102,35 +99,46 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
     );
   }
 
-  function updatePayrollField<K extends keyof MasterSettings["payroll"]>(
+  async function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (!LOGO_ACCEPTED_TYPES.includes(file.type as (typeof LOGO_ACCEPTED_TYPES)[number])) {
+      setErrorMessage("Logo harus berupa file PNG, JPG, atau WebP.");
+      return;
+    }
+
+    if (file.size > LOGO_MAX_SIZE_BYTES) {
+      setErrorMessage("Ukuran logo maksimal 512 KB agar database lokal tetap ringan.");
+      return;
+    }
+
+    try {
+      const logoDataUrl = await readFileAsDataUrl(file);
+      updateCompanyField("logoDataUrl", logoDataUrl);
+    } catch {
+      setErrorMessage("Logo gagal dibaca. Coba pilih file gambar lain.");
+    }
+  }
+
+  function updateEmailDeliveryField<K extends keyof MasterSettings["emailDelivery"]>(
     field: K,
-    value: MasterSettings["payroll"][K],
+    value: MasterSettings["emailDelivery"][K],
   ) {
     setDraft((current) =>
       current
         ? {
             ...current,
-            payroll: {
-              ...current.payroll,
+            emailDelivery: {
+              ...current.emailDelivery,
               [field]: value,
-            },
-          }
-        : current,
-    );
-  }
-
-  function updatePaydayType(paydayType: PayrollPaydayType) {
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            payroll: {
-              ...current.payroll,
-              paydayType,
-              paydayDayOfMonth:
-                paydayType === "day_of_month" ? (current.payroll.paydayDayOfMonth ?? 25) : null,
-              paydayWeekday:
-                paydayType === "weekday" ? (current.payroll.paydayWeekday ?? "friday") : null,
             },
           }
         : current,
@@ -140,9 +148,9 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
   const disabled = !canEdit || isSaving || isLoading;
 
   return (
-    <section className="panel" aria-label="Master perusahaan dan aturan payroll">
+    <section className="panel" aria-label="Master perusahaan dan pengiriman slip">
       <div className="panel-header">
-        <h2>Master Perusahaan & Payroll</h2>
+        <h2>Master Perusahaan & Pengiriman Slip</h2>
         <span className="status-pill">{canEdit ? "Admin bisa edit" : "Readonly"}</span>
       </div>
 
@@ -150,14 +158,15 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
       {!canEdit ? (
         <p className="readonly-note">Role saat ini hanya bisa melihat setting, tidak menyimpan perubahan.</p>
       ) : null}
-      {errorMessage ? <p className="alert">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-alert">{successMessage}</p> : null}
+      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
       {draft ? (
         <div className="settings-content">
           <div className="settings-form-grid">
             <fieldset className="settings-fieldset" disabled={disabled}>
-              <legend>Perusahaan</legend>
+              <legend className="visually-hidden">Perusahaan</legend>
+              <div className="settings-fieldset-title">Perusahaan</div>
               <label>
                 Nama perusahaan
                 <input
@@ -167,6 +176,37 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
                   value={draft.company.companyName}
                 />
               </label>
+              <div className="logo-upload-field">
+                <span className="logo-upload-label">Logo perusahaan</span>
+                <div className="logo-upload-control">
+                  <div className="logo-preview" aria-label="Preview logo perusahaan">
+                    {draft.company.logoDataUrl ? (
+                      <img alt="Logo perusahaan" src={draft.company.logoDataUrl} />
+                    ) : (
+                      <span>Belum ada logo</span>
+                    )}
+                  </div>
+                  <div className="logo-upload-actions">
+                    <label className="secondary-file-button">
+                      Pilih Logo
+                      <input
+                        accept="image/png,image/jpeg,image/webp"
+                        disabled={disabled}
+                        onChange={handleLogoChange}
+                        type="file"
+                      />
+                    </label>
+                    <button
+                      disabled={disabled || !draft.company.logoDataUrl}
+                      onClick={() => updateCompanyField("logoDataUrl", "")}
+                      type="button"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+                <span className="field-help">PNG, JPG, atau WebP. Maksimal 512 KB.</span>
+              </div>
               <label>
                 Alamat
                 <textarea
@@ -206,136 +246,61 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
             </fieldset>
 
             <fieldset className="settings-fieldset" disabled={disabled}>
-              <legend>Aturan Payroll</legend>
+              <legend className="visually-hidden">Pengiriman Email</legend>
+              <div className="settings-fieldset-title">Pengiriman Email Resend</div>
+              <label className="inline-check">
+                <input
+                  checked={draft.emailDelivery.enabled}
+                  onChange={(event) => updateEmailDeliveryField("enabled", event.target.checked)}
+                  type="checkbox"
+                />
+                Aktifkan pengiriman slip lewat email
+              </label>
+              <label>
+                API key Resend
+                <input
+                  autoComplete="off"
+                  maxLength={220}
+                  onChange={(event) => updateEmailDeliveryField("resendApiKey", event.target.value)}
+                  placeholder={draft.emailDelivery.resendApiKeySet ? "API key sudah tersimpan. Isi untuk mengganti." : "re_xxxxxxxxx"}
+                  type="password"
+                  value={draft.emailDelivery.resendApiKey}
+                />
+              </label>
+              <span className="field-help">
+                API key disimpan lokal dan tidak ditampilkan ulang setelah tersimpan.
+              </span>
               <div className="settings-two-columns">
                 <label>
-                  Tahun berjalan
+                  Nama pengirim
                   <input
-                    min={2020}
-                    max={2100}
-                    onChange={(event) =>
-                      updatePayrollField("currentYear", readNumber(event.target.value, 2026))
-                    }
-                    type="number"
-                    value={draft.payroll.currentYear}
+                    maxLength={120}
+                    onChange={(event) => updateEmailDeliveryField("fromName", event.target.value)}
+                    value={draft.emailDelivery.fromName}
                   />
                 </label>
                 <label>
-                  Hari kerja per minggu
+                  Email pengirim
                   <input
-                    min={1}
-                    max={7}
-                    onChange={(event) =>
-                      updatePayrollField("workingDaysPerWeek", readNumber(event.target.value, 6))
-                    }
-                    type="number"
-                    value={draft.payroll.workingDaysPerWeek}
+                    maxLength={160}
+                    onChange={(event) => updateEmailDeliveryField("fromEmail", event.target.value)}
+                    type="email"
+                    value={draft.emailDelivery.fromEmail}
                   />
                 </label>
               </div>
-
-              <div className="settings-two-columns">
-                <label>
-                  Tipe gajian
-                  <select
-                    onChange={(event) => {
-                      const paydayType = event.target.value as PayrollPaydayType;
-                      updatePaydayType(paydayType);
-                    }}
-                    value={draft.payroll.paydayType}
-                  >
-                    <option value="day_of_month">Tanggal setiap bulan</option>
-                    <option value="weekday">Hari tertentu</option>
-                  </select>
-                </label>
-                {draft.payroll.paydayType === "day_of_month" ? (
-                  <label>
-                    Tanggal gajian
-                    <input
-                      min={1}
-                      max={31}
-                      onChange={(event) =>
-                        updatePayrollField("paydayDayOfMonth", readNumber(event.target.value, 25))
-                      }
-                      type="number"
-                      value={draft.payroll.paydayDayOfMonth ?? 25}
-                    />
-                  </label>
-                ) : (
-                  <label>
-                    Hari gajian
-                    <select
-                      onChange={(event) =>
-                        updatePayrollField("paydayWeekday", event.target.value as PayrollWeekday)
-                      }
-                      value={draft.payroll.paydayWeekday ?? "friday"}
-                    >
-                      {weekdayOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </div>
-
-              <div className="settings-two-columns">
-                <label>
-                  Toleransi telat (menit)
-                  <input
-                    min={0}
-                    onChange={(event) =>
-                      updatePayrollField("lateToleranceMinutes", readNumber(event.target.value, 0))
-                    }
-                    type="number"
-                    value={draft.payroll.lateToleranceMinutes}
-                  />
-                </label>
-                <label>
-                  Denda telat
-                  <input
-                    min={0}
-                    onChange={(event) =>
-                      updatePayrollField("latePenaltyAmount", readNumber(event.target.value, 0))
-                    }
-                    type="number"
-                    value={draft.payroll.latePenaltyAmount}
-                  />
-                </label>
-              </div>
-
-              <div className="settings-two-columns">
-                <label>
-                  Toleransi pulang cepat (menit)
-                  <input
-                    min={0}
-                    onChange={(event) =>
-                      updatePayrollField(
-                        "earlyLeaveToleranceMinutes",
-                        readNumber(event.target.value, 0),
-                      )
-                    }
-                    type="number"
-                    value={draft.payroll.earlyLeaveToleranceMinutes}
-                  />
-                </label>
-                <label>
-                  Denda pulang cepat
-                  <input
-                    min={0}
-                    onChange={(event) =>
-                      updatePayrollField(
-                        "earlyLeavePenaltyAmount",
-                        readNumber(event.target.value, 0),
-                      )
-                    }
-                    type="number"
-                    value={draft.payroll.earlyLeavePenaltyAmount}
-                  />
-                </label>
-              </div>
+              <label>
+                Reply-to email
+                <input
+                  maxLength={160}
+                  onChange={(event) => updateEmailDeliveryField("replyToEmail", event.target.value)}
+                  placeholder="Opsional"
+                  type="email"
+                  value={draft.emailDelivery.replyToEmail}
+                />
+              </label>
             </fieldset>
+
           </div>
 
           <div className="settings-actions">
@@ -364,13 +329,21 @@ export function MasterSettingsPanel({ canEdit, session }: MasterSettingsPanelPro
   );
 }
 
-function readNumber(value: string, fallback: number): number {
-  if (value.trim() === "") {
-    return fallback;
-  }
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
 
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("file result is not a data URL"));
+    });
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("file read failed")));
+    reader.readAsDataURL(file);
+  });
 }
 
 function settingsChanged(current: MasterSettings | null, draft: MasterSettings): boolean {
@@ -379,5 +352,6 @@ function settingsChanged(current: MasterSettings | null, draft: MasterSettings):
   }
 
   return JSON.stringify(current.company) !== JSON.stringify(draft.company)
-    || JSON.stringify(current.payroll) !== JSON.stringify(draft.payroll);
+    || JSON.stringify(current.payroll) !== JSON.stringify(draft.payroll)
+    || JSON.stringify(current.emailDelivery) !== JSON.stringify(draft.emailDelivery);
 }

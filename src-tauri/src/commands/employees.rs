@@ -7,6 +7,8 @@ use crate::services::employee_service;
 pub struct EmployeeDto {
     id: String,
     nik: String,
+    whatsapp_number: String,
+    email: String,
     name: String,
     hire_date: String,
     npwp: String,
@@ -16,7 +18,6 @@ pub struct EmployeeDto {
     position: String,
     status: String,
     employment_type: String,
-    salary_amount: i64,
     payment_method: String,
     pph21_enabled: bool,
     shift_type: String,
@@ -40,6 +41,8 @@ pub struct EmployeeListFilterDto {
 #[derive(Deserialize)]
 pub struct EmployeeInputDto {
     nik: String,
+    whatsapp_number: String,
+    email: String,
     name: String,
     hire_date: String,
     npwp: String,
@@ -49,7 +52,6 @@ pub struct EmployeeInputDto {
     position: String,
     status: String,
     employment_type: String,
-    salary_amount: i64,
     payment_method: String,
     pph21_enabled: bool,
     shift_type: String,
@@ -104,6 +106,8 @@ fn to_employee_dto(employee: employee_service::Employee) -> EmployeeDto {
     EmployeeDto {
         id: employee.id,
         nik: employee.nik,
+        whatsapp_number: employee.whatsapp_number,
+        email: employee.email,
         name: employee.name,
         hire_date: employee.hire_date,
         npwp: employee.npwp,
@@ -113,7 +117,6 @@ fn to_employee_dto(employee: employee_service::Employee) -> EmployeeDto {
         position: employee.position,
         status: employee.status,
         employment_type: employee.employment_type,
-        salary_amount: employee.salary_amount,
         payment_method: employee.payment_method,
         pph21_enabled: employee.pph21_enabled,
         shift_type: employee.shift_type,
@@ -142,6 +145,8 @@ fn to_employee_list_filter(
 fn to_employee_input(input: EmployeeInputDto) -> employee_service::EmployeeInput {
     employee_service::EmployeeInput {
         nik: input.nik,
+        whatsapp_number: input.whatsapp_number,
+        email: input.email,
         name: input.name,
         hire_date: input.hire_date,
         npwp: input.npwp,
@@ -151,7 +156,6 @@ fn to_employee_input(input: EmployeeInputDto) -> employee_service::EmployeeInput
         position: input.position,
         status: input.status,
         employment_type: input.employment_type,
-        salary_amount: input.salary_amount,
         payment_method: input.payment_method,
         pph21_enabled: input.pph21_enabled,
         shift_type: input.shift_type,

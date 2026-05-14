@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { AppNotice } from "../../../components/shared/AppNotice";
 import type { AuthSession } from "../../auth/types";
 import { listActiveEmployees } from "../../employees/services/employee.service";
 import {
@@ -122,8 +123,8 @@ export function AttendanceImportPanel({ canEdit, session }: AttendanceImportPane
         <p className="readonly-note">Role saat ini hanya bisa melihat preview absensi.</p>
       ) : null}
       {isReading ? <p className="status-note">Membaca workbook lokal...</p> : null}
-      {errorMessage ? <p className="alert">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-alert">{successMessage}</p> : null}
+      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
       {preview ? (
         <div className="attendance-import-content">

@@ -1,4 +1,6 @@
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
+import type { WorkShift } from "../../attendance/types";
+import type { OrganizationReferenceItem } from "../../organization/types";
 import {
   EMPLOYEE_STATUS_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
@@ -11,22 +13,37 @@ import type { Employee, EmployeeInput } from "../types";
 type EmployeeFormProps = {
   disabled: boolean;
   draft: EmployeeInput;
+  departments: OrganizationReferenceItem[];
   isSaving: boolean;
+  positions: OrganizationReferenceItem[];
   selectedEmployee: Employee | null;
+  workShifts: WorkShift[];
   onDeactivate: () => void;
   onSubmit: () => void;
   onUpdateDraft: <K extends keyof EmployeeInput>(field: K, value: EmployeeInput[K]) => void;
 };
 
 export function EmployeeForm({
+  departments,
   disabled,
   draft,
   isSaving,
   onDeactivate,
   onSubmit,
   onUpdateDraft,
+  positions,
   selectedEmployee,
+  workShifts,
 }: EmployeeFormProps) {
+  const departmentOptions = ensureCurrentOption(activeReferenceNames(departments), draft.department);
+  const positionOptions = ensureCurrentOption(activeReferenceNames(positions), draft.position);
+  const workScheduleOptions = ensureCurrentOption(
+    workShifts
+      .filter((shift) => shift.isActive)
+      .map(formatWorkShiftOption),
+    draft.workSchedule,
+  );
+
   return (
     <form
       className="employee-form"
@@ -61,6 +78,32 @@ export function EmployeeForm({
             />
           </label>
         </div>
+
+        <div className="settings-two-columns">
+          <label>
+            Nomor WhatsApp
+            <input
+              inputMode="tel"
+              maxLength={32}
+              onChange={(event) => onUpdateDraft("whatsappNumber", event.target.value)}
+              placeholder="Contoh: 081234567890"
+              value={draft.whatsappNumber}
+            />
+          </label>
+          <label>
+            Email slip gaji
+            <input
+              maxLength={160}
+              onChange={(event) => onUpdateDraft("email", event.target.value)}
+              placeholder="pegawai@email.com"
+              type="email"
+              value={draft.email}
+            />
+          </label>
+        </div>
+        <span className="field-help employee-field-note">
+          WhatsApp dipakai sebagai fallback manual. Email dipakai untuk pengiriman slip PDF otomatis.
+        </span>
 
         <div className="settings-two-columns">
           <label>
@@ -117,23 +160,35 @@ export function EmployeeForm({
             <span className="field-label">
               Departemen <span className="required-label">Wajib</span>
             </span>
-            <input
-              maxLength={100}
+            <select
               onChange={(event) => onUpdateDraft("department", event.target.value)}
               required
               value={draft.department}
-            />
+            >
+              <option value="">Pilih departemen</option>
+              {departmentOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span className="field-label">
               Jabatan <span className="required-label">Wajib</span>
             </span>
-            <input
-              maxLength={100}
+            <select
               onChange={(event) => onUpdateDraft("position", event.target.value)}
               required
               value={draft.position}
-            />
+            >
+              <option value="">Pilih jabatan</option>
+              {positionOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
@@ -172,15 +227,6 @@ export function EmployeeForm({
 
         <div className="settings-two-columns">
           <label>
-            Nominal gaji
-            <input
-              min={0}
-              onChange={(event) => onUpdateDraft("salaryAmount", readNumber(event.target.value, 0))}
-              type="number"
-              value={draft.salaryAmount}
-            />
-          </label>
-          <label>
             Pembayaran gaji
             <select
               onChange={(event) =>
@@ -194,6 +240,14 @@ export function EmployeeForm({
                 </option>
               ))}
             </select>
+          </label>
+          <label className="inline-check">
+            <input
+              checked={draft.pph21Enabled}
+              onChange={(event) => onUpdateDraft("pph21Enabled", event.target.checked)}
+              type="checkbox"
+            />
+            PPh 21 aktif
           </label>
         </div>
 
@@ -217,23 +271,21 @@ export function EmployeeForm({
             <span className="field-label">
               Jam kerja <span className="required-label">Wajib</span>
             </span>
-            <input
-              maxLength={80}
+            <select
               onChange={(event) => onUpdateDraft("workSchedule", event.target.value)}
               required
               value={draft.workSchedule}
-            />
+            >
+              <option value="">Pilih jam kerja</option>
+              {workScheduleOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
-        <label className="inline-check">
-          <input
-            checked={draft.pph21Enabled}
-            onChange={(event) => onUpdateDraft("pph21Enabled", event.target.checked)}
-            type="checkbox"
-          />
-          PPh 21 aktif
-        </label>
       </fieldset>
 
       {selectedEmployee ? (
@@ -254,6 +306,30 @@ export function EmployeeForm({
       </div>
     </form>
   );
+}
+
+function activeReferenceNames(items: OrganizationReferenceItem[]): string[] {
+  return items
+    .filter((item) => item.isActive)
+    .sort((first, second) => first.sortOrder - second.sortOrder || first.name.localeCompare(second.name))
+    .map((item) => item.name);
+}
+
+function ensureCurrentOption(options: string[], currentValue: string): string[] {
+  const trimmed = currentValue.trim();
+  if (trimmed === "" || options.includes(trimmed)) {
+    return options;
+  }
+
+  return [trimmed, ...options];
+}
+
+function formatWorkShiftOption(shift: WorkShift): string {
+  if (shift.isOff) {
+    return `${shift.name} (Off)`;
+  }
+
+  return `${shift.name} (${shift.startTime}-${shift.endTime})`;
 }
 
 function readNumber(value: string, fallback: number): number {

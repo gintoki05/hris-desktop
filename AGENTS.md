@@ -283,6 +283,7 @@ Useful reusable UI patterns:
 
 - `PageHeader`
 - `DataTable`
+- `Pagination`
 - `EmptyState`
 - `ConfirmDialog`
 - `SectionHeader`
@@ -290,6 +291,14 @@ Useful reusable UI patterns:
 - `CurrencyInput`
 - `DateRangeInput`
 - `StatusBadge`
+
+Table and pagination rules:
+
+- Any table that can grow beyond one screen of rows must provide pagination or another explicit row-limiting pattern.
+- Prefer a reusable pagination component/pattern shared from `src/components/shared` or `src/components/ui` instead of building ad hoc pagination inside each feature.
+- Pagination state may stay local to the table component unless filters/page state must be shared across screens.
+- Keep pagination controls predictable: previous/next, current page, total pages or total rows, and a clear disabled state at boundaries.
+- If a table later needs non-trivial sorting, filtering, column state, and pagination together, consider a table abstraction such as TanStack Table before adding more custom table logic.
 
 ## Payslip Rules
 

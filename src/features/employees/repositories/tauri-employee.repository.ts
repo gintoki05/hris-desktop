@@ -15,6 +15,8 @@ import type {
 type EmployeeDto = {
   id: string;
   nik: string;
+  whatsapp_number: string;
+  email: string;
   name: string;
   hire_date: string;
   npwp: string;
@@ -24,7 +26,6 @@ type EmployeeDto = {
   position: string;
   status: EmployeeStatus;
   employment_type: EmploymentType;
-  salary_amount: number;
   payment_method: SalaryPaymentMethod;
   pph21_enabled: boolean;
   shift_type: ShiftType;
@@ -114,6 +115,8 @@ function toEmployee(dto: EmployeeDto): Employee {
   return {
     id: dto.id,
     nik: dto.nik,
+    whatsappNumber: dto.whatsapp_number,
+    email: dto.email,
     name: dto.name,
     hireDate: dto.hire_date,
     npwp: dto.npwp,
@@ -123,7 +126,6 @@ function toEmployee(dto: EmployeeDto): Employee {
     position: dto.position,
     status: dto.status,
     employmentType: dto.employment_type,
-    salaryAmount: dto.salary_amount,
     paymentMethod: dto.payment_method,
     pph21Enabled: dto.pph21_enabled,
     shiftType: dto.shift_type,
@@ -135,6 +137,8 @@ function toEmployee(dto: EmployeeDto): Employee {
 function toEmployeeInputDto(input: EmployeeInput): EmployeeInputDto {
   return {
     nik: input.nik,
+    whatsapp_number: input.whatsappNumber,
+    email: input.email,
     name: input.name,
     hire_date: input.hireDate,
     npwp: input.npwp,
@@ -144,7 +148,6 @@ function toEmployeeInputDto(input: EmployeeInput): EmployeeInputDto {
     position: input.position,
     status: input.status,
     employment_type: input.employmentType,
-    salary_amount: input.salaryAmount,
     payment_method: input.paymentMethod,
     pph21_enabled: input.pph21Enabled,
     shift_type: input.shiftType,

@@ -1,3 +1,4 @@
+import { AppNotice } from "../../../components/shared/AppNotice";
 import type { FoundationStatus } from "../types";
 
 type FoundationStatusPanelProps = {
@@ -7,30 +8,36 @@ type FoundationStatusPanelProps = {
 
 export function FoundationStatusPanel({ errorMessage, status }: FoundationStatusPanelProps) {
   const isDatabaseReady = Boolean(status?.database.foreignKeysEnabled);
+  const migrationCount = status?.database.migrationsApplied ?? 0;
 
   return (
     <section className="panel" aria-label="Status fondasi aplikasi">
       <div className="panel-header">
         <h2>Status Lokal</h2>
-        <span className="status-pill">{isDatabaseReady ? "Database siap" : "Preview"}</span>
+        <span className="status-pill">{isDatabaseReady ? "Siap digunakan" : "Memuat"}</span>
       </div>
 
       <div className="status-grid">
-        <StatusItem label="SQLite" value={isDatabaseReady ? "App data directory" : "Desktop app"} />
-        <StatusItem label="Journal" value={status?.database.journalMode.toUpperCase() ?? "-"} />
+        <StatusItem label="Database lokal" value={isDatabaseReady ? "Siap" : "Memuat"} />
         <StatusItem
-          label="Foreign keys"
-          value={status?.database.foreignKeysEnabled ? "Aktif" : "-"}
+          label="Mode penyimpanan"
+          value={status?.database.journalMode.toLowerCase() === "wal" ? "Aman untuk desktop" : "Standar"}
         />
         <StatusItem
-          label="Migrasi"
-          value={status ? `${status.database.migrationsApplied} diterapkan` : "-"}
+          label="Validasi data"
+          value={status?.database.foreignKeysEnabled ? "Aktif" : "Belum aktif"}
+        />
+        <StatusItem
+          label="Struktur data"
+          value={status ? (migrationCount > 0 ? "Terbaru" : "Awal") : "Memuat"}
         />
       </div>
 
-      {errorMessage ? <p className="alert">{errorMessage}</p> : null}
+      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
 
-      <p className="status-note">Backup lokal tersedia. Restore akan membuat safety backup.</p>
+      <p className="status-note">
+        Data disimpan di komputer ini. Backup dan restore tetap memakai safety backup sebelum mengganti data.
+      </p>
     </section>
   );
 }

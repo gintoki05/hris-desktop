@@ -33,6 +33,7 @@ export type CompanySettings = {
   contactPhone: string;
   contactEmail: string;
   treasurerName: string;
+  logoDataUrl: string;
 };
 
 export type PayrollSettings = {
@@ -47,6 +48,16 @@ export type PayrollSettings = {
   earlyLeavePenaltyAmount: number;
 };
 
+export type EmailDeliverySettings = {
+  provider: "resend";
+  enabled: boolean;
+  resendApiKey: string;
+  resendApiKeySet: boolean;
+  fromName: string;
+  fromEmail: string;
+  replyToEmail: string;
+};
+
 export type SettingsAuditEvent = {
   id: string;
   actorDisplayName: string;
@@ -58,12 +69,14 @@ export type SettingsAuditEvent = {
 export type MasterSettings = {
   company: CompanySettings;
   payroll: PayrollSettings;
+  emailDelivery: EmailDeliverySettings;
   recentAuditEvents: SettingsAuditEvent[];
 };
 
 export type MasterSettingsInput = {
   company: CompanySettings;
   payroll: PayrollSettings;
+  emailDelivery: EmailDeliverySettings;
   actor: {
     userId: string;
     displayName: string;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AppNotice } from "../../../components/shared/AppNotice";
 import type { AuthSession } from "../../auth/types";
 import { listActiveEmployees } from "../../employees/services/employee.service";
 import type { Employee } from "../../employees/types";
@@ -208,8 +209,8 @@ export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) 
         <p className="readonly-note">Periode ini sudah terkunci oleh payroll final.</p>
       ) : null}
       {noticeMessage ? <p className="readonly-note">{noticeMessage}</p> : null}
-      {errorMessage ? <p className="alert">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-alert">{successMessage}</p> : null}
+      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
       {draft ? (
         <div className="schedule-content">

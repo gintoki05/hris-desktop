@@ -8,12 +8,17 @@ import { LoginPanel } from "./features/auth/components/LoginPanel";
 import { useAuthSession } from "./features/auth/hooks/useAuthSession";
 import type { AuthPermission } from "./features/auth/types";
 import { EmployeeMasterPanel } from "./features/employees/components/EmployeeMasterPanel";
+import { OrganizationMasterPanel } from "./features/organization/components/OrganizationMasterPanel";
+import { PayslipManagerPanel } from "./features/payslips/components/PayslipManagerPanel";
+import { PayslipWhatsAppPanel } from "./features/payslips/components/PayslipWhatsAppPanel";
+import { ManualPayrollPanel } from "./features/payroll/components/ManualPayrollPanel";
 import { FoundationStatusPanel } from "./features/settings/components/FoundationStatusPanel";
 import { MasterSettingsPanel } from "./features/settings/components/MasterSettingsPanel";
 import { getFoundationStatus } from "./features/settings/services/foundation.service";
-import type { FoundationStatus } from "./features/settings/types";
+import { getMasterSettings } from "./features/settings/services/master-settings.service";
+import type { FoundationStatus, MasterSettings } from "./features/settings/types";
 
-type MasterDataTab = "settings" | "employees" | "attendance-master";
+type MasterDataTab = "settings" | "employees" | "organization-master" | "attendance-master";
 
 const masterDataTabs: Array<{
   id: MasterDataTab;
@@ -21,6 +26,7 @@ const masterDataTabs: Array<{
 }> = [
   { id: "settings", label: "Pengaturan" },
   { id: "employees", label: "Karyawan" },
+  { id: "organization-master", label: "Referensi" },
   { id: "attendance-master", label: "Master Absensi" },
 ];
 
@@ -29,6 +35,7 @@ function App() {
   const [activePage, setActivePage] = useState<AdminPage>("dashboard");
   const [activeMasterDataTab, setActiveMasterDataTab] = useState<MasterDataTab>("settings");
   const [status, setStatus] = useState<FoundationStatus | null>(null);
+  const [masterSettings, setMasterSettings] = useState<MasterSettings | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,46 +63,25 @@ function App() {
     };
   }, []);
 
-  const modules = useMemo(
-    (): Array<{
-      name: string;
-      description: string;
-      status: string;
-      permission: AuthPermission;
-    }> => [
-      {
-        name: "Master Data",
-        description: "Perusahaan, karyawan, komponen payroll, dan pengaturan periode.",
-        permission: "master-data:manage",
-        status: "Admin Payroll",
-      },
-      {
-        name: "Absensi",
-        description: "Import Excel/fingerprint, input manual dan koreksi absensi.",
-        permission: "attendance:manage",
-        status: "Admin Payroll",
-      },
-      {
-        name: "Payroll",
-        description: "Perhitungan deterministic dari snapshot absensi dan master payroll.",
-        permission: "payroll:manage",
-        status: "Admin Payroll",
-      },
-      {
-        name: "Laporan",
-        description: "Ringkasan payroll dan informasi manajemen tanpa aksi perubahan.",
-        permission: "reports:view",
-        status: "Manajemen",
-      },
-      {
-        name: "Slip PDF",
-        description: "Generate slip dari payroll final tanpa membaca live master data.",
-        permission: "payslips:view",
-        status: "Terbatas role",
-      },
-    ],
-    [],
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    getMasterSettings()
+      .then((settings) => {
+        if (isMounted) {
+          setMasterSettings(settings);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setMasterSettings(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const actions = useMemo(
     (): Array<{
@@ -125,6 +111,20 @@ function App() {
     return titles[activePage];
   }, [activePage]);
 
+  const pageDescription = useMemo(() => {
+    const descriptions: Record<AdminPage, string> = {
+      attendance: "Kelola jadwal kerja dan import absensi fingerprint dari file Excel lokal.",
+      backup: "Buat backup lokal dan siapkan restore database dengan safety copy.",
+      dashboard: "Ringkasan status aplikasi dan akses cepat untuk pekerjaan payroll harian.",
+      "master-data": "Kelola data dasar perusahaan, karyawan, shift, kode absensi, dan aturan lembur.",
+      payroll: "Hitung payroll dari snapshot absensi dan master payroll yang sudah tervalidasi.",
+      payslips: "Kelola periode slip, snapshot data gaji final, PDF massal, dan status kirim WhatsApp manual.",
+      reports: "Lihat ringkasan payroll dan data manajemen tanpa aksi perubahan.",
+    };
+
+    return descriptions[activePage];
+  }, [activePage]);
+
   if (!auth.session) {
     return (
       <LoginPanel
@@ -139,6 +139,8 @@ function App() {
     <AdminLayout
       activePage={activePage}
       can={auth.can}
+      companyLogoDataUrl={masterSettings?.company.logoDataUrl ?? ""}
+      companyName={masterSettings?.company.companyName ?? "Klinik Permata Medika"}
       onLogout={auth.logout}
       onNavigate={setActivePage}
       session={auth.session}
@@ -147,8 +149,8 @@ function App() {
         <div>
           <p className="eyebrow">HRIS Payroll Klinik</p>
           <h1>{pageTitle}</h1>
+          <p className="page-description">{pageDescription}</p>
         </div>
-        <span className="offline-badge">Offline-first</span>
       </section>
 
       {activePage === "dashboard" ? (
@@ -158,7 +160,6 @@ function App() {
           <section className="panel">
             <div className="panel-header">
               <h2>Aksi Penting</h2>
-              <span className="status-pill">Role-gated</span>
             </div>
             <div className="action-row" aria-label="Aksi penting">
               {actions.map((action) => (
@@ -172,22 +173,6 @@ function App() {
                 </button>
               ))}
             </div>
-          </section>
-
-          <section className="module-grid" aria-label="Modul V1">
-            {modules.map((module) => (
-              <article
-                className="module-card"
-                data-disabled={!auth.can(module.permission)}
-                key={module.name}
-              >
-                <div>
-                  <h2>{module.name}</h2>
-                  <p>{module.description}</p>
-                </div>
-                <span>{auth.can(module.permission) ? module.status : "Tidak tersedia"}</span>
-              </article>
-            ))}
           </section>
         </>
       ) : null}
@@ -212,12 +197,20 @@ function App() {
           {activeMasterDataTab === "settings" ? (
             <MasterSettingsPanel
               canEdit={auth.can("master-data:manage")}
+              onSettingsSaved={setMasterSettings}
               session={auth.session}
             />
           ) : null}
 
           {activeMasterDataTab === "employees" ? (
             <EmployeeMasterPanel
+              canEdit={auth.can("master-data:manage")}
+              session={auth.session}
+            />
+          ) : null}
+
+          {activeMasterDataTab === "organization-master" ? (
+            <OrganizationMasterPanel
               canEdit={auth.can("master-data:manage")}
               session={auth.session}
             />
@@ -247,9 +240,9 @@ function App() {
       ) : null}
 
       {activePage === "payroll" ? (
-        <PlaceholderPanel
-          description="Halaman perhitungan payroll akan menampilkan periode, snapshot absensi, komponen pendapatan/potongan, dan proses finalisasi."
-          title="Payroll belum diimplementasikan"
+        <ManualPayrollPanel
+          canEdit={auth.can("payroll:manage")}
+          session={auth.session}
         />
       ) : null}
 
@@ -261,10 +254,13 @@ function App() {
       ) : null}
 
       {activePage === "payslips" ? (
-        <PlaceholderPanel
-          description="Halaman slip PDF akan memakai payroll snapshot final, bukan live master data."
-          title="Slip PDF belum diimplementasikan"
-        />
+        <>
+          <PayslipManagerPanel
+            canEdit={auth.can("payroll:manage")}
+            session={auth.session}
+          />
+          <PayslipWhatsAppPanel session={auth.session} />
+        </>
       ) : null}
 
       {activePage === "backup" ? (

@@ -1,4 +1,3 @@
-import { formatRupiah } from "../../../lib/formatters/currency";
 import { EMPLOYEE_STATUS_OPTIONS, EMPLOYMENT_TYPE_OPTIONS } from "../constants";
 import { labelFor } from "../services/employee-export.service";
 import type { Employee } from "../types";
@@ -23,11 +22,12 @@ export function EmployeeTable({
         <thead>
           <tr>
             <th>Nama</th>
+            <th>WhatsApp</th>
+            <th>Email</th>
             <th>Departemen</th>
             <th>Jabatan</th>
             <th>Sistem</th>
             <th>Status</th>
-            <th>Gaji</th>
           </tr>
         </thead>
         <tbody>
@@ -41,6 +41,8 @@ export function EmployeeTable({
                 <strong>{employee.name}</strong>
                 <span>{employee.nik}</span>
               </td>
+              <td>{maskWhatsAppNumber(employee.whatsappNumber)}</td>
+              <td>{maskEmail(employee.email)}</td>
               <td>{employee.department}</td>
               <td>{employee.position}</td>
               <td>{labelFor(employee.employmentType, EMPLOYMENT_TYPE_OPTIONS)}</td>
@@ -49,16 +51,38 @@ export function EmployeeTable({
                   {labelFor(employee.status, EMPLOYEE_STATUS_OPTIONS)}
                 </span>
               </td>
-              <td>{formatRupiah(employee.salaryAmount)}</td>
             </tr>
           ))}
           {!isLoading && employees.length === 0 ? (
             <tr>
-              <td colSpan={6}>Belum ada data karyawan sesuai filter.</td>
+              <td colSpan={7}>Belum ada data karyawan sesuai filter.</td>
             </tr>
           ) : null}
         </tbody>
       </table>
     </div>
   );
+}
+
+function maskEmail(value: string): string {
+  const [localPart, domain] = value.split("@");
+
+  if (!localPart || !domain) {
+    return "-";
+  }
+
+  return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+function maskWhatsAppNumber(value: string): string {
+  if (!value) {
+    return "-";
+  }
+
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 7) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 4)}${"*".repeat(Math.max(0, digits.length - 7))}${digits.slice(-3)}`;
 }

@@ -7,6 +7,7 @@ use tauri::AppHandle;
 use crate::{error::AppError, services::database_service};
 
 const DEFAULT_SETTINGS_ID: &str = "default";
+const MAX_LOGO_DATA_URL_LENGTH: usize = 700_000;
 
 #[derive(Clone, PartialEq, Serialize)]
 pub struct CompanySettings {
@@ -15,6 +16,7 @@ pub struct CompanySettings {
     pub contact_phone: String,
     pub contact_email: String,
     pub treasurer_name: String,
+    pub logo_data_url: String,
 }
 
 #[derive(Clone, PartialEq, Serialize)]
@@ -39,10 +41,31 @@ pub struct SettingsAuditEvent {
     pub created_at: String,
 }
 
+#[derive(Clone, PartialEq, Serialize)]
+pub struct EmailDeliverySettings {
+    pub provider: String,
+    pub enabled: bool,
+    pub resend_api_key_set: bool,
+    pub from_name: String,
+    pub from_email: String,
+    pub reply_to_email: String,
+}
+
+#[derive(Clone)]
+pub struct StoredEmailDeliverySettings {
+    pub provider: String,
+    pub enabled: bool,
+    pub resend_api_key: String,
+    pub from_name: String,
+    pub from_email: String,
+    pub reply_to_email: String,
+}
+
 #[derive(Serialize)]
 pub struct MasterSettings {
     pub company: CompanySettings,
     pub payroll: PayrollSettings,
+    pub email_delivery: EmailDeliverySettings,
     pub recent_audit_events: Vec<SettingsAuditEvent>,
 }
 
@@ -53,6 +76,7 @@ pub struct CompanySettingsInput {
     pub contact_phone: String,
     pub contact_email: String,
     pub treasurer_name: String,
+    pub logo_data_url: String,
 }
 
 #[derive(Deserialize)]
@@ -76,9 +100,20 @@ pub struct SettingsActor {
 }
 
 #[derive(Deserialize)]
+pub struct EmailDeliverySettingsInput {
+    pub provider: String,
+    pub enabled: bool,
+    pub resend_api_key: String,
+    pub from_name: String,
+    pub from_email: String,
+    pub reply_to_email: String,
+}
+
+#[derive(Deserialize)]
 pub struct MasterSettingsInput {
     pub company: CompanySettingsInput,
     pub payroll: PayrollSettingsInput,
+    pub email_delivery: EmailDeliverySettingsInput,
     pub actor: SettingsActor,
 }
 
@@ -89,6 +124,7 @@ pub fn get_master_settings(app: &AppHandle) -> Result<MasterSettings, AppError> 
     Ok(MasterSettings {
         company: get_company_settings(&connection)?,
         payroll: get_payroll_settings(&connection)?,
+        email_delivery: public_email_delivery_settings(&get_stored_email_delivery_settings(&connection)?),
         recent_audit_events: list_recent_audit_events(&connection)?,
     })
 }
@@ -108,7 +144,16 @@ pub fn update_master_settings(
 
     let previous_company = get_company_settings(&transaction)?;
     let previous_payroll = get_payroll_settings(&transaction)?;
-    let changed_fields = changed_field_names(&previous_company, &company, &previous_payroll, &payroll);
+    let previous_email_delivery = get_stored_email_delivery_settings(&transaction)?;
+    let email_delivery = normalize_email_delivery_input(input.email_delivery, &previous_email_delivery)?;
+    let changed_fields = changed_field_names(
+        &previous_company,
+        &company,
+        &previous_payroll,
+        &payroll,
+        &public_email_delivery_settings(&previous_email_delivery),
+        &public_email_delivery_settings(&email_delivery),
+    );
 
     transaction.execute(
         "
@@ -119,8 +164,9 @@ pub fn update_master_settings(
             contact_phone = ?3,
             contact_email = ?4,
             treasurer_name = ?5,
+            logo_data_url = ?6,
             updated_at = datetime('now')
-        WHERE id = ?6
+        WHERE id = ?7
         ",
         (
             &company.company_name,
@@ -128,6 +174,7 @@ pub fn update_master_settings(
             &company.contact_phone,
             &company.contact_email,
             &company.treasurer_name,
+            &company.logo_data_url,
             DEFAULT_SETTINGS_ID,
         ),
     )?;
@@ -158,6 +205,30 @@ pub fn update_master_settings(
             payroll.late_penalty_amount,
             payroll.early_leave_tolerance_minutes,
             payroll.early_leave_penalty_amount,
+            DEFAULT_SETTINGS_ID,
+        ),
+    )?;
+
+    transaction.execute(
+        "
+        UPDATE email_delivery_settings
+        SET
+            provider = ?1,
+            enabled = ?2,
+            resend_api_key = ?3,
+            from_name = ?4,
+            from_email = ?5,
+            reply_to_email = ?6,
+            updated_at = datetime('now')
+        WHERE id = ?7
+        ",
+        (
+            &email_delivery.provider,
+            if email_delivery.enabled { 1 } else { 0 },
+            &email_delivery.resend_api_key,
+            &email_delivery.from_name,
+            &email_delivery.from_email,
+            &email_delivery.reply_to_email,
             DEFAULT_SETTINGS_ID,
         ),
     )?;
@@ -194,11 +265,17 @@ pub fn update_master_settings(
     get_master_settings(app)
 }
 
+pub fn get_resend_delivery_settings(app: &AppHandle) -> Result<StoredEmailDeliverySettings, AppError> {
+    database_service::initialize_local_database(app)?;
+    let connection = database_service::open_local_connection(app)?;
+    get_stored_email_delivery_settings(&connection)
+}
+
 fn get_company_settings(connection: &rusqlite::Connection) -> Result<CompanySettings, AppError> {
     connection
         .query_row(
             "
-            SELECT company_name, address, contact_phone, contact_email, treasurer_name
+            SELECT company_name, address, contact_phone, contact_email, treasurer_name, logo_data_url
             FROM company_settings
             WHERE id = ?1
             ",
@@ -210,6 +287,7 @@ fn get_company_settings(connection: &rusqlite::Connection) -> Result<CompanySett
                     contact_phone: row.get(2)?,
                     contact_email: row.get(3)?,
                     treasurer_name: row.get(4)?,
+                    logo_data_url: row.get(5)?,
                 })
             },
         )
@@ -253,6 +331,44 @@ fn get_payroll_settings(connection: &rusqlite::Connection) -> Result<PayrollSett
         .ok_or_else(|| AppError::Database("aturan payroll default tidak ditemukan".to_string()))
 }
 
+fn get_stored_email_delivery_settings(
+    connection: &rusqlite::Connection,
+) -> Result<StoredEmailDeliverySettings, AppError> {
+    connection
+        .query_row(
+            "
+            SELECT provider, enabled, resend_api_key, from_name, from_email, reply_to_email
+            FROM email_delivery_settings
+            WHERE id = ?1
+            ",
+            [DEFAULT_SETTINGS_ID],
+            |row| {
+                let enabled: i32 = row.get(1)?;
+                Ok(StoredEmailDeliverySettings {
+                    provider: row.get(0)?,
+                    enabled: enabled == 1,
+                    resend_api_key: row.get(2)?,
+                    from_name: row.get(3)?,
+                    from_email: row.get(4)?,
+                    reply_to_email: row.get(5)?,
+                })
+            },
+        )
+        .optional()?
+        .ok_or_else(|| AppError::Database("setting email delivery default tidak ditemukan".to_string()))
+}
+
+fn public_email_delivery_settings(settings: &StoredEmailDeliverySettings) -> EmailDeliverySettings {
+    EmailDeliverySettings {
+        provider: settings.provider.clone(),
+        enabled: settings.enabled,
+        resend_api_key_set: !settings.resend_api_key.trim().is_empty(),
+        from_name: settings.from_name.clone(),
+        from_email: settings.from_email.clone(),
+        reply_to_email: settings.reply_to_email.clone(),
+    }
+}
+
 fn list_recent_audit_events(
     connection: &rusqlite::Connection,
 ) -> Result<Vec<SettingsAuditEvent>, AppError> {
@@ -291,6 +407,7 @@ fn normalize_company_input(input: CompanySettingsInput) -> Result<CompanySetting
         contact_phone: input.contact_phone.trim().to_string(),
         contact_email: input.contact_email.trim().to_string(),
         treasurer_name: input.treasurer_name.trim().to_string(),
+        logo_data_url: input.logo_data_url.trim().to_string(),
     };
 
     if company.company_name.is_empty() {
@@ -299,7 +416,32 @@ fn normalize_company_input(input: CompanySettingsInput) -> Result<CompanySetting
         ));
     }
 
+    validate_logo_data_url(&company.logo_data_url)?;
+
     Ok(company)
+}
+
+fn validate_logo_data_url(value: &str) -> Result<(), AppError> {
+    if value.is_empty() {
+        return Ok(());
+    }
+
+    if value.len() > MAX_LOGO_DATA_URL_LENGTH {
+        return Err(AppError::Database(
+            "ukuran logo terlalu besar untuk disimpan di database lokal".to_string(),
+        ));
+    }
+
+    if value.starts_with("data:image/png;base64,")
+        || value.starts_with("data:image/jpeg;base64,")
+        || value.starts_with("data:image/webp;base64,")
+    {
+        return Ok(());
+    }
+
+    Err(AppError::Database(
+        "format logo harus PNG, JPG, atau WebP".to_string(),
+    ))
 }
 
 fn normalize_payroll_input(input: PayrollSettingsInput) -> Result<PayrollSettings, AppError> {
@@ -338,6 +480,41 @@ fn normalize_payroll_input(input: PayrollSettingsInput) -> Result<PayrollSetting
     validate_non_negative("denda pulang cepat", payroll.early_leave_penalty_amount)?;
 
     Ok(payroll)
+}
+
+fn normalize_email_delivery_input(
+    input: EmailDeliverySettingsInput,
+    previous: &StoredEmailDeliverySettings,
+) -> Result<StoredEmailDeliverySettings, AppError> {
+    let api_key = if input.resend_api_key.trim().is_empty() {
+        previous.resend_api_key.clone()
+    } else {
+        input.resend_api_key.trim().to_string()
+    };
+    let settings = StoredEmailDeliverySettings {
+        provider: input.provider.trim().to_string(),
+        enabled: input.enabled,
+        resend_api_key: api_key,
+        from_name: input.from_name.trim().to_string(),
+        from_email: input.from_email.trim().to_lowercase(),
+        reply_to_email: input.reply_to_email.trim().to_lowercase(),
+    };
+
+    if settings.provider != "resend" {
+        return Err(AppError::Database("provider email delivery tidak valid".to_string()));
+    }
+
+    if settings.enabled {
+        if settings.resend_api_key.is_empty() {
+            return Err(AppError::Database("API key Resend wajib diisi".to_string()));
+        }
+        validate_required("nama pengirim email", &settings.from_name)?;
+        validate_required("email pengirim", &settings.from_email)?;
+        validate_optional_email("email pengirim", &settings.from_email)?;
+        validate_optional_email("reply-to email", &settings.reply_to_email)?;
+    }
+
+    Ok(settings)
 }
 
 fn validate_payday(payroll: &PayrollSettings) -> Result<(), AppError> {
@@ -392,6 +569,26 @@ where
     Ok(())
 }
 
+fn validate_required(label: &str, value: &str) -> Result<(), AppError> {
+    if value.trim().is_empty() {
+        return Err(AppError::Database(format!("{label} wajib diisi")));
+    }
+
+    Ok(())
+}
+
+fn validate_optional_email(label: &str, value: &str) -> Result<(), AppError> {
+    if value.trim().is_empty() {
+        return Ok(());
+    }
+
+    if value.contains('@') && value.rsplit('@').next().is_some_and(|domain| domain.contains('.')) {
+        return Ok(());
+    }
+
+    Err(AppError::Database(format!("{label} tidak valid")))
+}
+
 fn validate_actor(actor: &SettingsActor) -> Result<(), AppError> {
     if actor.role != "admin_payroll" {
         return Err(AppError::Database(
@@ -413,6 +610,8 @@ fn changed_field_names(
     company: &CompanySettings,
     previous_payroll: &PayrollSettings,
     payroll: &PayrollSettings,
+    previous_email_delivery: &EmailDeliverySettings,
+    email_delivery: &EmailDeliverySettings,
 ) -> Vec<&'static str> {
     let mut fields = Vec::new();
 
@@ -443,6 +642,11 @@ fn changed_field_names(
     );
     push_if_changed(
         &mut fields,
+        previous_company.logo_data_url != company.logo_data_url,
+        "logo perusahaan",
+    );
+    push_if_changed(
+        &mut fields,
         previous_payroll.current_year != payroll.current_year,
         "tahun berjalan",
     );
@@ -469,6 +673,11 @@ fn changed_field_names(
         previous_payroll.early_leave_tolerance_minutes != payroll.early_leave_tolerance_minutes
             || previous_payroll.early_leave_penalty_amount != payroll.early_leave_penalty_amount,
         "aturan pulang cepat",
+    );
+    push_if_changed(
+        &mut fields,
+        previous_email_delivery != email_delivery,
+        "pengiriman email",
     );
 
     fields

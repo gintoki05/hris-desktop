@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { AppNotice } from "../../../components/shared/AppNotice";
+import { PaginationControls } from "../../../components/shared/PaginationControls";
+import { getAttendanceMasterData } from "../../attendance/services/attendance-master.service";
+import type { WorkShift } from "../../attendance/types";
 import type { AuthSession } from "../../auth/types";
+import { getOrganizationMasterData } from "../../organization/services/organization-master.service";
+import type { OrganizationMasterData } from "../../organization/types";
 import { EmployeeForm } from "./EmployeeForm";
 import { EmployeeTable } from "./EmployeeTable";
 import { exportEmployeeCsv } from "../services/employee-export.service";
@@ -18,6 +24,8 @@ type EmployeeMasterPanelProps = {
 
 const emptyEmployeeDraft: EmployeeInput = {
   nik: "",
+  whatsappNumber: "",
+  email: "",
   name: "",
   hireDate: new Date().toISOString().slice(0, 10),
   npwp: "",
@@ -27,17 +35,24 @@ const emptyEmployeeDraft: EmployeeInput = {
   position: "",
   status: "active",
   employmentType: "monthly",
-  salaryAmount: 0,
   paymentMethod: "cash",
   pph21Enabled: true,
   shiftType: "non_shift",
   workSchedule: "Regular",
 };
 
+const EMPLOYEE_PAGE_SIZE = 5;
+
 export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [organizationMaster, setOrganizationMaster] = useState<OrganizationMasterData>({
+    departments: [],
+    positions: [],
+  });
+  const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [query, setQuery] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EmployeeInput>(emptyEmployeeDraft);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +64,44 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
     () => employees.find((employee) => employee.id === selectedEmployeeId) ?? null,
     [employees, selectedEmployeeId],
   );
+  const totalPages = Math.max(1, Math.ceil(employees.length / EMPLOYEE_PAGE_SIZE));
+  const paginatedEmployees = useMemo(
+    () => employees.slice((currentPage - 1) * EMPLOYEE_PAGE_SIZE, currentPage * EMPLOYEE_PAGE_SIZE),
+    [currentPage, employees],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([getOrganizationMasterData(), getAttendanceMasterData()])
+      .then(([nextOrganizationMaster, nextAttendanceMaster]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setOrganizationMaster(nextOrganizationMaster);
+        setWorkShifts(nextAttendanceMaster.shifts);
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : "Master referensi karyawan gagal dibaca.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [includeInactive, query]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,8 +220,8 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
       {!canEdit ? (
         <p className="readonly-note">Role saat ini hanya bisa melihat dan mencari data karyawan.</p>
       ) : null}
-      {errorMessage ? <p className="alert">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-alert">{successMessage}</p> : null}
+      {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
+      {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
       <div className="employee-content">
         <div className="employee-toolbar">
@@ -200,20 +253,32 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
 
         <div className="employee-grid">
           <EmployeeTable
-            employees={employees}
+            employees={paginatedEmployees}
             isLoading={isLoading}
             onSelect={handleSelect}
             selectedEmployeeId={selectedEmployeeId}
           />
 
+          <PaginationControls
+            ariaLabel="Pagination karyawan"
+            currentPage={currentPage}
+            itemLabel="karyawan"
+            onPageChange={setCurrentPage}
+            pageSize={EMPLOYEE_PAGE_SIZE}
+            totalItems={employees.length}
+          />
+
           <EmployeeForm
+            departments={organizationMaster.departments}
             disabled={disabled}
             draft={draft}
             isSaving={isSaving}
             onDeactivate={() => void handleDeactivate()}
             onSubmit={() => void handleSubmit()}
             onUpdateDraft={updateDraft}
+            positions={organizationMaster.positions}
             selectedEmployee={selectedEmployee}
+            workShifts={workShifts}
           />
         </div>
       </div>
@@ -232,6 +297,8 @@ function toEmployeeActor(session: AuthSession): EmployeeActor {
 function toEmployeeInput(employee: Employee): EmployeeInput {
   return {
     nik: employee.nik,
+    whatsappNumber: employee.whatsappNumber,
+    email: employee.email,
     name: employee.name,
     hireDate: employee.hireDate,
     npwp: employee.npwp,
@@ -241,7 +308,6 @@ function toEmployeeInput(employee: Employee): EmployeeInput {
     position: employee.position,
     status: employee.status,
     employmentType: employee.employmentType,
-    salaryAmount: employee.salaryAmount,
     paymentMethod: employee.paymentMethod,
     pph21Enabled: employee.pph21Enabled,
     shiftType: employee.shiftType,

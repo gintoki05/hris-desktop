@@ -12,6 +12,8 @@ export function exportEmployeeCsv(employees: Employee[]) {
     [
       "Nama",
       "NIK",
+      "WhatsApp",
+      "Email",
       "Tanggal Masuk",
       "NPWP",
       "Status Kawin",
@@ -20,7 +22,6 @@ export function exportEmployeeCsv(employees: Employee[]) {
       "Jabatan",
       "Status",
       "Sistem Gaji",
-      "Nominal Gaji",
       "Pembayaran",
       "PPh 21",
       "Tipe Shift",
@@ -29,6 +30,8 @@ export function exportEmployeeCsv(employees: Employee[]) {
     ...employees.map((employee) => [
       employee.name,
       employee.nik,
+      employee.whatsappNumber,
+      employee.email,
       employee.hireDate,
       employee.npwp,
       labelFor(employee.maritalStatus, MARITAL_STATUS_OPTIONS),
@@ -37,7 +40,6 @@ export function exportEmployeeCsv(employees: Employee[]) {
       employee.position,
       labelFor(employee.status, EMPLOYEE_STATUS_OPTIONS),
       labelFor(employee.employmentType, EMPLOYMENT_TYPE_OPTIONS),
-      String(employee.salaryAmount),
       labelFor(employee.paymentMethod, PAYMENT_METHOD_OPTIONS),
       employee.pph21Enabled ? "Aktif" : "Nonaktif",
       labelFor(employee.shiftType, SHIFT_TYPE_OPTIONS),

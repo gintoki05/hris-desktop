@@ -10,6 +10,7 @@ pub struct CompanySettingsDto {
     contact_phone: String,
     contact_email: String,
     treasurer_name: String,
+    logo_data_url: String,
 }
 
 #[derive(Serialize)]
@@ -35,9 +36,20 @@ pub struct SettingsAuditEventDto {
 }
 
 #[derive(Serialize)]
+pub struct EmailDeliverySettingsDto {
+    provider: String,
+    enabled: bool,
+    resend_api_key_set: bool,
+    from_name: String,
+    from_email: String,
+    reply_to_email: String,
+}
+
+#[derive(Serialize)]
 pub struct MasterSettingsDto {
     company: CompanySettingsDto,
     payroll: PayrollSettingsDto,
+    email_delivery: EmailDeliverySettingsDto,
     recent_audit_events: Vec<SettingsAuditEventDto>,
 }
 
@@ -48,6 +60,7 @@ pub struct CompanySettingsInputDto {
     contact_phone: String,
     contact_email: String,
     treasurer_name: String,
+    logo_data_url: String,
 }
 
 #[derive(Deserialize)]
@@ -71,9 +84,20 @@ pub struct SettingsActorDto {
 }
 
 #[derive(Deserialize)]
+pub struct EmailDeliverySettingsInputDto {
+    provider: String,
+    enabled: bool,
+    resend_api_key: String,
+    from_name: String,
+    from_email: String,
+    reply_to_email: String,
+}
+
+#[derive(Deserialize)]
 pub struct MasterSettingsInputDto {
     company: CompanySettingsInputDto,
     payroll: PayrollSettingsInputDto,
+    email_delivery: EmailDeliverySettingsInputDto,
     actor: SettingsActorDto,
 }
 
@@ -102,6 +126,7 @@ fn to_master_settings_dto(settings: settings_service::MasterSettings) -> MasterS
             contact_phone: settings.company.contact_phone,
             contact_email: settings.company.contact_email,
             treasurer_name: settings.company.treasurer_name,
+            logo_data_url: settings.company.logo_data_url,
         },
         payroll: PayrollSettingsDto {
             current_year: settings.payroll.current_year,
@@ -113,6 +138,14 @@ fn to_master_settings_dto(settings: settings_service::MasterSettings) -> MasterS
             late_penalty_amount: settings.payroll.late_penalty_amount,
             early_leave_tolerance_minutes: settings.payroll.early_leave_tolerance_minutes,
             early_leave_penalty_amount: settings.payroll.early_leave_penalty_amount,
+        },
+        email_delivery: EmailDeliverySettingsDto {
+            provider: settings.email_delivery.provider,
+            enabled: settings.email_delivery.enabled,
+            resend_api_key_set: settings.email_delivery.resend_api_key_set,
+            from_name: settings.email_delivery.from_name,
+            from_email: settings.email_delivery.from_email,
+            reply_to_email: settings.email_delivery.reply_to_email,
         },
         recent_audit_events: settings
             .recent_audit_events
@@ -138,6 +171,7 @@ fn to_master_settings_input(
             contact_phone: input.company.contact_phone,
             contact_email: input.company.contact_email,
             treasurer_name: input.company.treasurer_name,
+            logo_data_url: input.company.logo_data_url,
         },
         payroll: settings_service::PayrollSettingsInput {
             current_year: input.payroll.current_year,
@@ -149,6 +183,14 @@ fn to_master_settings_input(
             late_penalty_amount: input.payroll.late_penalty_amount,
             early_leave_tolerance_minutes: input.payroll.early_leave_tolerance_minutes,
             early_leave_penalty_amount: input.payroll.early_leave_penalty_amount,
+        },
+        email_delivery: settings_service::EmailDeliverySettingsInput {
+            provider: input.email_delivery.provider,
+            enabled: input.email_delivery.enabled,
+            resend_api_key: input.email_delivery.resend_api_key,
+            from_name: input.email_delivery.from_name,
+            from_email: input.email_delivery.from_email,
+            reply_to_email: input.email_delivery.reply_to_email,
         },
         actor: settings_service::SettingsActor {
             user_id: input.actor.user_id,

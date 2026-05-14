@@ -13,6 +13,7 @@ type CompanySettingsDto = {
   contact_phone: string;
   contact_email: string;
   treasurer_name: string;
+  logo_data_url: string;
 };
 
 type PayrollSettingsDto = {
@@ -35,15 +36,28 @@ type SettingsAuditEventDto = {
   created_at: string;
 };
 
+type EmailDeliverySettingsDto = {
+  provider: "resend";
+  enabled: boolean;
+  resend_api_key_set: boolean;
+  from_name: string;
+  from_email: string;
+  reply_to_email: string;
+};
+
 type MasterSettingsDto = {
   company: CompanySettingsDto;
   payroll: PayrollSettingsDto;
+  email_delivery: EmailDeliverySettingsDto;
   recent_audit_events: SettingsAuditEventDto[];
 };
 
 type MasterSettingsInputDto = {
   company: CompanySettingsDto;
   payroll: PayrollSettingsDto;
+  email_delivery: Omit<EmailDeliverySettingsDto, "resend_api_key_set"> & {
+    resend_api_key: string;
+  };
   actor: {
     user_id: string;
     display_name: string;
@@ -78,6 +92,7 @@ function toMasterSettings(dto: MasterSettingsDto): MasterSettings {
       contactPhone: dto.company.contact_phone,
       contactEmail: dto.company.contact_email,
       treasurerName: dto.company.treasurer_name,
+      logoDataUrl: dto.company.logo_data_url,
     },
     payroll: {
       currentYear: dto.payroll.current_year,
@@ -89,6 +104,15 @@ function toMasterSettings(dto: MasterSettingsDto): MasterSettings {
       latePenaltyAmount: dto.payroll.late_penalty_amount,
       earlyLeaveToleranceMinutes: dto.payroll.early_leave_tolerance_minutes,
       earlyLeavePenaltyAmount: dto.payroll.early_leave_penalty_amount,
+    },
+    emailDelivery: {
+      provider: dto.email_delivery.provider,
+      enabled: dto.email_delivery.enabled,
+      resendApiKey: "",
+      resendApiKeySet: dto.email_delivery.resend_api_key_set,
+      fromName: dto.email_delivery.from_name,
+      fromEmail: dto.email_delivery.from_email,
+      replyToEmail: dto.email_delivery.reply_to_email,
     },
     recentAuditEvents: dto.recent_audit_events.map((event) => ({
       id: event.id,
@@ -108,6 +132,7 @@ function toMasterSettingsInputDto(input: MasterSettingsInput): MasterSettingsInp
       contact_phone: input.company.contactPhone,
       contact_email: input.company.contactEmail,
       treasurer_name: input.company.treasurerName,
+      logo_data_url: input.company.logoDataUrl,
     },
     payroll: {
       current_year: input.payroll.currentYear,
@@ -119,6 +144,14 @@ function toMasterSettingsInputDto(input: MasterSettingsInput): MasterSettingsInp
       late_penalty_amount: input.payroll.latePenaltyAmount,
       early_leave_tolerance_minutes: input.payroll.earlyLeaveToleranceMinutes,
       early_leave_penalty_amount: input.payroll.earlyLeavePenaltyAmount,
+    },
+    email_delivery: {
+      provider: input.emailDelivery.provider,
+      enabled: input.emailDelivery.enabled,
+      resend_api_key: input.emailDelivery.resendApiKey,
+      from_name: input.emailDelivery.fromName,
+      from_email: input.emailDelivery.fromEmail,
+      reply_to_email: input.emailDelivery.replyToEmail,
     },
     actor: {
       user_id: input.actor.userId,
@@ -146,6 +179,7 @@ function createBrowserPreviewSettings(): MasterSettings {
       contactPhone: "",
       contactEmail: "",
       treasurerName: "",
+      logoDataUrl: "",
     },
     payroll: {
       currentYear: new Date().getFullYear(),
@@ -157,6 +191,15 @@ function createBrowserPreviewSettings(): MasterSettings {
       latePenaltyAmount: 0,
       earlyLeaveToleranceMinutes: 0,
       earlyLeavePenaltyAmount: 0,
+    },
+    emailDelivery: {
+      provider: "resend",
+      enabled: false,
+      resendApiKey: "",
+      resendApiKeySet: false,
+      fromName: "Payroll Klinik",
+      fromEmail: "",
+      replyToEmail: "",
     },
     recentAuditEvents: [],
   };

@@ -10,6 +10,8 @@ use crate::{error::AppError, services::database_service};
 pub struct Employee {
     pub id: String,
     pub nik: String,
+    pub whatsapp_number: String,
+    pub email: String,
     pub name: String,
     pub hire_date: String,
     pub npwp: String,
@@ -19,7 +21,6 @@ pub struct Employee {
     pub position: String,
     pub status: String,
     pub employment_type: String,
-    pub salary_amount: i64,
     pub payment_method: String,
     pub pph21_enabled: bool,
     pub shift_type: String,
@@ -43,6 +44,8 @@ pub struct EmployeeListFilter {
 #[derive(Deserialize)]
 pub struct EmployeeInput {
     pub nik: String,
+    pub whatsapp_number: String,
+    pub email: String,
     pub name: String,
     pub hire_date: String,
     pub npwp: String,
@@ -52,7 +55,6 @@ pub struct EmployeeInput {
     pub position: String,
     pub status: String,
     pub employment_type: String,
-    pub salary_amount: i64,
     pub payment_method: String,
     pub pph21_enabled: bool,
     pub shift_type: String,
@@ -71,8 +73,8 @@ pub fn list_employees(
     let sql = if filter.include_inactive {
         "
         SELECT
-            id, nik, name, hire_date, npwp, marital_status, dependents, department,
-            position, status, employment_type, salary_amount, payment_method,
+            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            position, status, employment_type, payment_method,
             pph21_enabled, shift_type, work_schedule, updated_at
         FROM employees
         WHERE ?1 = ''
@@ -85,8 +87,8 @@ pub fn list_employees(
     } else {
         "
         SELECT
-            id, nik, name, hire_date, npwp, marital_status, dependents, department,
-            position, status, employment_type, salary_amount, payment_method,
+            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            position, status, employment_type, payment_method,
             pph21_enabled, shift_type, work_schedule, updated_at
         FROM employees
         WHERE status = 'active'
@@ -128,19 +130,21 @@ pub fn create_employee(
     transaction.execute(
         "
         INSERT INTO employees (
-            id, nik, name, hire_date, npwp, marital_status, dependents, department,
-            position, status, employment_type, salary_amount, payment_method,
+            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            position, status, employment_type, payment_method,
             pph21_enabled, shift_type, work_schedule, created_at, updated_at
         )
         VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
-            ?9, ?10, ?11, ?12, ?13,
-            ?14, ?15, ?16, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+            ?11, ?12, ?13, ?14,
+            ?15, ?16, ?17, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         )
         ",
         params![
             &employee.id,
             &employee.nik,
+            &employee.whatsapp_number,
+            &employee.email,
             &employee.name,
             &employee.hire_date,
             &employee.npwp,
@@ -150,7 +154,6 @@ pub fn create_employee(
             &employee.position,
             &employee.status,
             &employee.employment_type,
-            employee.salary_amount,
             &employee.payment_method,
             if employee.pph21_enabled { 1 } else { 0 },
             &employee.shift_type,
@@ -184,25 +187,28 @@ pub fn update_employee(
         UPDATE employees
         SET
             nik = ?1,
-            name = ?2,
-            hire_date = ?3,
-            npwp = ?4,
-            marital_status = ?5,
-            dependents = ?6,
-            department = ?7,
-            position = ?8,
-            status = ?9,
-            employment_type = ?10,
-            salary_amount = ?11,
-            payment_method = ?12,
-            pph21_enabled = ?13,
-            shift_type = ?14,
-            work_schedule = ?15,
+            whatsapp_number = ?2,
+            email = ?3,
+            name = ?4,
+            hire_date = ?5,
+            npwp = ?6,
+            marital_status = ?7,
+            dependents = ?8,
+            department = ?9,
+            position = ?10,
+            status = ?11,
+            employment_type = ?12,
+            payment_method = ?13,
+            pph21_enabled = ?14,
+            shift_type = ?15,
+            work_schedule = ?16,
             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-        WHERE id = ?16
+        WHERE id = ?17
         ",
         params![
             &employee.nik,
+            &employee.whatsapp_number,
+            &employee.email,
             &employee.name,
             &employee.hire_date,
             &employee.npwp,
@@ -212,7 +218,6 @@ pub fn update_employee(
             &employee.position,
             &employee.status,
             &employee.employment_type,
-            employee.salary_amount,
             &employee.payment_method,
             if employee.pph21_enabled { 1 } else { 0 },
             &employee.shift_type,
@@ -261,8 +266,8 @@ fn get_employee_by_id(app: &AppHandle, id: &str) -> Result<Option<Employee>, App
         .query_row(
             "
             SELECT
-                id, nik, name, hire_date, npwp, marital_status, dependents, department,
-                position, status, employment_type, salary_amount, payment_method,
+                id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+                position, status, employment_type, payment_method,
                 pph21_enabled, shift_type, work_schedule, updated_at
             FROM employees
             WHERE id = ?1
@@ -275,26 +280,27 @@ fn get_employee_by_id(app: &AppHandle, id: &str) -> Result<Option<Employee>, App
 }
 
 fn employee_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Employee> {
-    let pph21_enabled: i32 = row.get(13)?;
+    let pph21_enabled: i32 = row.get(14)?;
 
     Ok(Employee {
         id: row.get(0)?,
         nik: row.get(1)?,
-        name: row.get(2)?,
-        hire_date: row.get(3)?,
-        npwp: row.get(4)?,
-        marital_status: row.get(5)?,
-        dependents: row.get(6)?,
-        department: row.get(7)?,
-        position: row.get(8)?,
-        status: row.get(9)?,
-        employment_type: row.get(10)?,
-        salary_amount: row.get(11)?,
-        payment_method: row.get(12)?,
+        whatsapp_number: row.get(2)?,
+        email: row.get(3)?,
+        name: row.get(4)?,
+        hire_date: row.get(5)?,
+        npwp: row.get(6)?,
+        marital_status: row.get(7)?,
+        dependents: row.get(8)?,
+        department: row.get(9)?,
+        position: row.get(10)?,
+        status: row.get(11)?,
+        employment_type: row.get(12)?,
+        payment_method: row.get(13)?,
         pph21_enabled: pph21_enabled == 1,
-        shift_type: row.get(14)?,
-        work_schedule: row.get(15)?,
-        updated_at: row.get(16)?,
+        shift_type: row.get(15)?,
+        work_schedule: row.get(16)?,
+        updated_at: row.get(17)?,
     })
 }
 
@@ -302,6 +308,8 @@ fn normalize_employee_input(id: String, input: EmployeeInput) -> Result<Employee
     let employee = Employee {
         id,
         nik: input.nik.trim().to_string(),
+        whatsapp_number: input.whatsapp_number.trim().to_string(),
+        email: input.email.trim().to_lowercase(),
         name: input.name.trim().to_string(),
         hire_date: input.hire_date.trim().to_string(),
         npwp: input.npwp.trim().to_string(),
@@ -311,7 +319,6 @@ fn normalize_employee_input(id: String, input: EmployeeInput) -> Result<Employee
         position: input.position.trim().to_string(),
         status: input.status.trim().to_string(),
         employment_type: input.employment_type.trim().to_string(),
-        salary_amount: input.salary_amount,
         payment_method: input.payment_method.trim().to_string(),
         pph21_enabled: input.pph21_enabled,
         shift_type: input.shift_type.trim().to_string(),
@@ -339,12 +346,6 @@ fn validate_employee(employee: &Employee) -> Result<(), AppError> {
     if employee.dependents < 0 || employee.dependents > 10 {
         return Err(AppError::Database(
             "jumlah tanggungan harus berada di rentang 0 sampai 10".to_string(),
-        ));
-    }
-
-    if employee.salary_amount < 0 {
-        return Err(AppError::Database(
-            "nominal gaji tidak boleh negatif".to_string(),
         ));
     }
 
@@ -377,7 +378,20 @@ fn validate_employee(employee: &Employee) -> Result<(), AppError> {
     }
 
     validate_required("jam kerja", &employee.work_schedule)?;
+    validate_optional_email("email karyawan", &employee.email)?;
     Ok(())
+}
+
+fn validate_optional_email(label: &str, value: &str) -> Result<(), AppError> {
+    if value.trim().is_empty() {
+        return Ok(());
+    }
+
+    if value.contains('@') && value.rsplit('@').next().is_some_and(|domain| domain.contains('.')) {
+        return Ok(());
+    }
+
+    Err(AppError::Database(format!("{label} tidak valid")))
 }
 
 fn validate_required(label: &str, value: &str) -> Result<(), AppError> {

@@ -11,6 +11,8 @@ export type SalaryPaymentMethod = "cash" | "bank_transfer";
 export type Employee = {
   id: string;
   nik: string;
+  whatsappNumber: string;
+  email: string;
   name: string;
   hireDate: string;
   position: string;
@@ -19,7 +21,6 @@ export type Employee = {
   dependents: number;
   department: string;
   employmentType: EmploymentType;
-  salaryAmount: number;
   paymentMethod: SalaryPaymentMethod;
   pph21Enabled: boolean;
   shiftType: ShiftType;
@@ -30,6 +31,8 @@ export type Employee = {
 
 export type EmployeeInput = {
   nik: string;
+  whatsappNumber: string;
+  email: string;
   name: string;
   hireDate: string;
   npwp: string;
@@ -39,7 +42,6 @@ export type EmployeeInput = {
   position: string;
   status: EmployeeStatus;
   employmentType: EmploymentType;
-  salaryAmount: number;
   paymentMethod: SalaryPaymentMethod;
   pph21Enabled: boolean;
   shiftType: ShiftType;

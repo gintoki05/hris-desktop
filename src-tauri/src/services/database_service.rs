@@ -396,6 +396,291 @@ const MIGRATIONS: &[Migration] = &[
             ON attendance_entries(import_batch_id);
     ",
     },
+    Migration {
+        id: "202605080001_company_logo_setting",
+        sql: "
+        ALTER TABLE company_settings ADD COLUMN logo_data_url TEXT NOT NULL DEFAULT '';
+    ",
+    },
+    Migration {
+        id: "202605080002_organization_reference_master",
+        sql: "
+        CREATE TABLE IF NOT EXISTS departments (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS positions (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO departments (id, name, is_active, sort_order, created_at, updated_at)
+        VALUES
+            ('department-poli-umum', 'Poli Umum', 1, 10, datetime('now'), datetime('now')),
+            ('department-poli-gigi', 'Poli Gigi', 1, 20, datetime('now'), datetime('now')),
+            ('department-farmasi', 'Farmasi', 1, 30, datetime('now'), datetime('now')),
+            ('department-pendaftaran', 'Pendaftaran', 1, 40, datetime('now'), datetime('now')),
+            ('department-kasir', 'Kasir', 1, 50, datetime('now'), datetime('now')),
+            ('department-manajemen', 'Manajemen', 1, 60, datetime('now'), datetime('now'));
+
+        INSERT OR IGNORE INTO positions (id, name, is_active, sort_order, created_at, updated_at)
+        VALUES
+            ('position-dokter', 'Dokter', 1, 10, datetime('now'), datetime('now')),
+            ('position-perawat', 'Perawat', 1, 20, datetime('now'), datetime('now')),
+            ('position-bidan', 'Bidan', 1, 30, datetime('now'), datetime('now')),
+            ('position-apoteker', 'Apoteker', 1, 40, datetime('now'), datetime('now')),
+            ('position-admin-pendaftaran', 'Admin Pendaftaran', 1, 50, datetime('now'), datetime('now')),
+            ('position-kasir', 'Kasir', 1, 60, datetime('now'), datetime('now')),
+            ('position-manajemen', 'Manajemen', 1, 70, datetime('now'), datetime('now'));
+
+        INSERT OR IGNORE INTO departments (id, name, is_active, sort_order, created_at, updated_at)
+        SELECT
+            'department-existing-' || lower(replace(replace(trim(department), ' ', '-'), '/', '-')),
+            trim(department),
+            1,
+            500,
+            datetime('now'),
+            datetime('now')
+        FROM employees
+        WHERE trim(department) != '';
+
+        INSERT OR IGNORE INTO positions (id, name, is_active, sort_order, created_at, updated_at)
+        SELECT
+            'position-existing-' || lower(replace(replace(trim(position), ' ', '-'), '/', '-')),
+            trim(position),
+            1,
+            500,
+            datetime('now'),
+            datetime('now')
+        FROM employees
+        WHERE trim(position) != '';
+
+        CREATE INDEX IF NOT EXISTS idx_departments_active ON departments(is_active);
+        CREATE INDEX IF NOT EXISTS idx_positions_active ON positions(is_active);
+    ",
+    },
+    Migration {
+        id: "202605100001_payroll_whatsapp_delivery",
+        sql: "
+        ALTER TABLE employees ADD COLUMN whatsapp_number TEXT NOT NULL DEFAULT '';
+        ALTER TABLE payroll_payslip_snapshots ADD COLUMN pdf_file_path TEXT NOT NULL DEFAULT '';
+
+        CREATE TABLE IF NOT EXISTS payroll_payslip_delivery_statuses (
+            payslip_snapshot_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL CHECK (status IN ('not_opened', 'opened', 'sent', 'failed')),
+            opened_at TEXT,
+            sent_at TEXT,
+            failed_at TEXT,
+            actor_user_id TEXT NOT NULL DEFAULT '',
+            actor_display_name TEXT NOT NULL DEFAULT '',
+            actor_role TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (payslip_snapshot_id) REFERENCES payroll_payslip_snapshots(id)
+        );
+    ",
+    },
+    Migration {
+        id: "202605100002_manual_payroll_drafts",
+        sql: "
+        CREATE TABLE IF NOT EXISTS payroll_manual_draft_items (
+            id TEXT PRIMARY KEY,
+            payroll_run_id TEXT NOT NULL,
+            employee_id TEXT NOT NULL,
+            income_components_json TEXT NOT NULL,
+            deduction_components_json TEXT NOT NULL,
+            gross_pay INTEGER NOT NULL,
+            total_deductions INTEGER NOT NULL,
+            net_pay INTEGER NOT NULL,
+            amount_in_words TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (payroll_run_id) REFERENCES payroll_runs(id),
+            FOREIGN KEY (employee_id) REFERENCES employees(id),
+            UNIQUE (payroll_run_id, employee_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_payroll_manual_draft_items_run
+            ON payroll_manual_draft_items(payroll_run_id);
+    ",
+    },
+    Migration {
+        id: "202605100003_email_delivery_resend",
+        sql: "
+        ALTER TABLE employees ADD COLUMN email TEXT NOT NULL DEFAULT '';
+
+        CREATE TABLE IF NOT EXISTS email_delivery_settings (
+            id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL DEFAULT 'resend' CHECK (provider IN ('resend')),
+            enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+            resend_api_key TEXT NOT NULL DEFAULT '',
+            from_name TEXT NOT NULL DEFAULT '',
+            from_email TEXT NOT NULL DEFAULT '',
+            reply_to_email TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO email_delivery_settings (
+            id, provider, enabled, resend_api_key, from_name, from_email, reply_to_email, created_at, updated_at
+        )
+        VALUES (
+            'default', 'resend', 0, '', '', '', '', datetime('now'), datetime('now')
+        );
+
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN channel TEXT NOT NULL DEFAULT 'whatsapp_manual';
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN provider_message_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN error_message TEXT NOT NULL DEFAULT '';
+    ",
+    },
+    Migration {
+        id: "202605140001_split_payslip_delivery_statuses",
+        sql: "
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN whatsapp_status TEXT NOT NULL DEFAULT 'not_opened';
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN email_status TEXT NOT NULL DEFAULT 'not_sent';
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN whatsapp_opened_at TEXT;
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN whatsapp_sent_at TEXT;
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN whatsapp_failed_at TEXT;
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN email_sent_at TEXT;
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN email_failed_at TEXT;
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN email_provider_message_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN whatsapp_error_message TEXT NOT NULL DEFAULT '';
+        ALTER TABLE payroll_payslip_delivery_statuses ADD COLUMN email_error_message TEXT NOT NULL DEFAULT '';
+
+        UPDATE payroll_payslip_delivery_statuses
+        SET
+            whatsapp_status = CASE
+                WHEN channel = 'email_resend' THEN 'not_opened'
+                WHEN status = 'sent' THEN 'sent_manual'
+                ELSE status
+            END,
+            email_status = CASE
+                WHEN channel = 'email_resend' THEN status
+                ELSE 'not_sent'
+            END,
+            whatsapp_opened_at = CASE WHEN channel != 'email_resend' THEN opened_at ELSE NULL END,
+            whatsapp_sent_at = CASE WHEN channel != 'email_resend' THEN sent_at ELSE NULL END,
+            whatsapp_failed_at = CASE WHEN channel != 'email_resend' THEN failed_at ELSE NULL END,
+            email_sent_at = CASE WHEN channel = 'email_resend' THEN sent_at ELSE NULL END,
+            email_failed_at = CASE WHEN channel = 'email_resend' THEN failed_at ELSE NULL END,
+            email_provider_message_id = CASE WHEN channel = 'email_resend' THEN provider_message_id ELSE '' END,
+            whatsapp_error_message = CASE WHEN channel != 'email_resend' THEN error_message ELSE '' END,
+            email_error_message = CASE WHEN channel = 'email_resend' THEN error_message ELSE '' END;
+    ",
+    },
+    Migration {
+        id: "202605110001_payslip_manager_foundation",
+        sql: "
+        CREATE TABLE IF NOT EXISTS payslip_periods (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'imported', 'pdf_ready', 'archived')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (start_date, end_date)
+        );
+
+        CREATE TABLE IF NOT EXISTS payslip_import_batches (
+            id TEXT PRIMARY KEY,
+            period_id TEXT NOT NULL,
+            source_file_name TEXT NOT NULL,
+            imported_by_user_id TEXT NOT NULL,
+            imported_by_display_name TEXT NOT NULL,
+            imported_by_role TEXT NOT NULL,
+            total_rows INTEGER NOT NULL DEFAULT 0 CHECK (total_rows >= 0),
+            valid_rows INTEGER NOT NULL DEFAULT 0 CHECK (valid_rows >= 0),
+            error_rows INTEGER NOT NULL DEFAULT 0 CHECK (error_rows >= 0),
+            notes TEXT NOT NULL DEFAULT '',
+            imported_at TEXT NOT NULL,
+            FOREIGN KEY (period_id) REFERENCES payslip_periods(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS payslip_snapshots (
+            id TEXT PRIMARY KEY,
+            period_id TEXT NOT NULL,
+            import_batch_id TEXT NOT NULL,
+            employee_id TEXT,
+            employee_nik TEXT NOT NULL DEFAULT '',
+            employee_name TEXT NOT NULL,
+            employee_position TEXT NOT NULL DEFAULT '',
+            whatsapp_number TEXT NOT NULL DEFAULT '',
+            snapshot_json TEXT NOT NULL,
+            net_pay INTEGER NOT NULL DEFAULT 0,
+            pdf_file_path TEXT NOT NULL DEFAULT '',
+            send_status TEXT NOT NULL DEFAULT 'not_generated'
+                CHECK (send_status IN ('not_generated', 'pdf_ready', 'whatsapp_opened', 'sent', 'failed_missing_number', 'failed')),
+            whatsapp_opened_at TEXT,
+            sent_marked_at TEXT,
+            status_updated_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (period_id) REFERENCES payslip_periods(id),
+            FOREIGN KEY (import_batch_id) REFERENCES payslip_import_batches(id),
+            FOREIGN KEY (employee_id) REFERENCES employees(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_payslip_periods_dates
+            ON payslip_periods(start_date, end_date);
+        CREATE INDEX IF NOT EXISTS idx_payslip_import_batches_period
+            ON payslip_import_batches(period_id);
+        CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_period
+            ON payslip_snapshots(period_id);
+        CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_batch
+            ON payslip_snapshots(import_batch_id);
+        CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_send_status
+            ON payslip_snapshots(send_status);
+    ",
+    },
+    Migration {
+        id: "202605140002_split_payslip_manager_send_status",
+        sql: "
+        ALTER TABLE payslip_snapshots ADD COLUMN whatsapp_status TEXT NOT NULL DEFAULT 'not_opened';
+        ALTER TABLE payslip_snapshots ADD COLUMN email_status TEXT NOT NULL DEFAULT 'not_sent';
+        ALTER TABLE payslip_snapshots ADD COLUMN whatsapp_sent_at TEXT;
+        ALTER TABLE payslip_snapshots ADD COLUMN whatsapp_failed_at TEXT;
+        ALTER TABLE payslip_snapshots ADD COLUMN email_sent_at TEXT;
+        ALTER TABLE payslip_snapshots ADD COLUMN email_failed_at TEXT;
+        ALTER TABLE payslip_snapshots ADD COLUMN email_error_message TEXT NOT NULL DEFAULT '';
+
+        UPDATE payslip_snapshots
+        SET
+            whatsapp_status = CASE
+                WHEN send_status = 'whatsapp_opened' THEN 'opened'
+                WHEN send_status = 'failed_missing_number' THEN 'missing_number'
+                WHEN send_status = 'failed' THEN 'failed'
+                WHEN send_status = 'sent' AND whatsapp_opened_at IS NOT NULL THEN 'sent_manual'
+                ELSE 'not_opened'
+            END,
+            email_status = CASE
+                WHEN send_status = 'sent' AND whatsapp_opened_at IS NULL THEN 'sent'
+                ELSE 'not_sent'
+            END,
+            whatsapp_sent_at = CASE
+                WHEN send_status = 'sent' AND whatsapp_opened_at IS NOT NULL THEN sent_marked_at
+                ELSE NULL
+            END,
+            whatsapp_failed_at = CASE WHEN send_status = 'failed' THEN status_updated_at ELSE NULL END,
+            email_sent_at = CASE
+                WHEN send_status = 'sent' AND whatsapp_opened_at IS NULL THEN sent_marked_at
+                ELSE NULL
+            END;
+
+        CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_whatsapp_status
+            ON payslip_snapshots(whatsapp_status);
+        CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_email_status
+            ON payslip_snapshots(email_status);
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {
