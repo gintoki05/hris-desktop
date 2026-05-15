@@ -242,125 +242,125 @@ export function WorkSchedulePanel({ canEdit, session }: WorkSchedulePanelProps) 
         {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
         {draft ? (
-          <div className="schedule-content">
+          <div className="grid gap-3">
             <div className="overflow-x-auto rounded-lg border bg-background">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Karyawan Aktif</TableHead>
-                  <TableHead>Tipe</TableHead>
-                  <TableHead>Shift</TableHead>
-                  <TableHead>Catatan</TableHead>
-                  <TableHead>Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {draft.entries.length === 0 ? (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6}>Belum ada jadwal untuk periode ini.</TableCell>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Karyawan Aktif</TableHead>
+                    <TableHead>Tipe</TableHead>
+                    <TableHead>Shift</TableHead>
+                    <TableHead>Catatan</TableHead>
+                    <TableHead>Aksi</TableHead>
                   </TableRow>
-                ) : (
-                  draft.entries.map((entry, index) => {
-                    const employee = employees.find((item) => item.id === entry.employeeId);
-                    const shift = activeShifts.find((item) => item.id === entry.shiftId);
+                </TableHeader>
+                <TableBody>
+                  {draft.entries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6}>Belum ada jadwal untuk periode ini.</TableCell>
+                    </TableRow>
+                  ) : (
+                    draft.entries.map((entry, index) => {
+                      const employee = employees.find((item) => item.id === entry.employeeId);
+                      const shift = activeShifts.find((item) => item.id === entry.shiftId);
 
-                    return (
-                      <TableRow key={entry.id ?? `${entry.employeeId}-${entry.workDate}-${index}`}>
-                        <TableCell>
-                          <Input
-                            disabled={disabled}
-                            max={endDate}
-                            min={startDate}
-                            type="date"
-                            value={entry.workDate}
-                            onChange={(event) =>
-                              handleEntryChange(index, { workDate: event.target.value })
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            disabled={disabled}
-                            onValueChange={(employeeId) => handleEntryChange(index, { employeeId })}
-                            value={entry.employeeId}
-                          >
-                            <SelectTrigger className="min-w-56">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {employees.map((item) => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.name} - {item.position}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {employee ? formatShiftType(employee.shiftType) : "Tidak aktif"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="grid gap-1">
+                      return (
+                        <TableRow key={entry.id ?? `${entry.employeeId}-${entry.workDate}-${index}`}>
+                          <TableCell>
+                            <Input
+                              disabled={disabled}
+                              max={endDate}
+                              min={startDate}
+                              type="date"
+                              value={entry.workDate}
+                              onChange={(event) =>
+                                handleEntryChange(index, { workDate: event.target.value })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
                             <Select
                               disabled={disabled}
-                              onValueChange={(shiftId) => handleEntryChange(index, { shiftId })}
-                              value={entry.shiftId}
+                              onValueChange={(employeeId) => handleEntryChange(index, { employeeId })}
+                              value={entry.employeeId}
                             >
-                              <SelectTrigger className="min-w-44">
+                              <SelectTrigger className="min-w-56">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {activeShifts.map((item) => (
+                                {employees.map((item) => (
                                   <SelectItem key={item.id} value={item.id}>
-                                    {item.code} - {item.name}
+                                    {item.name} - {item.position}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            {shift ? <span>{shift.startTime} - {shift.endTime}</span> : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            disabled={disabled}
-                            placeholder="Opsional"
-                            value={entry.notes}
-                            onChange={(event) =>
-                              handleEntryChange(index, { notes: event.target.value })
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            disabled={disabled || Boolean(entry.id)}
-                            onClick={() => handleRemoveEntry(index)}
-                            type="button"
-                            variant="outline"
-                          >
-                            {entry.id ? "Tersimpan" : "Hapus Baris"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {employee ? formatShiftType(employee.shiftType) : "Tidak aktif"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="grid gap-1">
+                              <Select
+                                disabled={disabled}
+                                onValueChange={(shiftId) => handleEntryChange(index, { shiftId })}
+                                value={entry.shiftId}
+                              >
+                                <SelectTrigger className="min-w-44">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {activeShifts.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      {item.code} - {item.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {shift ? <span>{shift.startTime} - {shift.endTime}</span> : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              disabled={disabled}
+                              placeholder="Opsional"
+                              value={entry.notes}
+                              onChange={(event) =>
+                                handleEntryChange(index, { notes: event.target.value })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              disabled={disabled || Boolean(entry.id)}
+                              onClick={() => handleRemoveEntry(index)}
+                              type="button"
+                              variant="outline"
+                            >
+                              {entry.id ? "Tersimpan" : "Hapus Baris"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-          <div className="flex justify-end">
-            <Button
-              disabled={disabled || !scheduleChanged(currentPeriod, draft)}
-              onClick={handleSave}
-              type="button"
-            >
-              {isSaving ? "Menyimpan..." : "Simpan Jadwal Kerja"}
-            </Button>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                disabled={disabled || !scheduleChanged(currentPeriod, draft)}
+                onClick={handleSave}
+                type="button"
+              >
+                {isSaving ? "Menyimpan..." : "Simpan Jadwal Kerja"}
+              </Button>
+            </div>
           </div>
-        </div>
         ) : null}
       </PanelBody>
     </FeaturePanel>

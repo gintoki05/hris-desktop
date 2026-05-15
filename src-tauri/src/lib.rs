@@ -11,6 +11,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::database::initialize_local_database,
             commands::backup::create_local_database_backup,
+            commands::backup::list_local_database_backups,
             commands::backup::restore_local_database_backup,
             commands::settings::get_master_settings,
             commands::settings::update_master_settings,
@@ -37,6 +38,7 @@ pub fn run() {
             commands::payslip_manager::export_payslip_template_file,
             commands::payslip_manager::generate_payslip_pdfs,
             commands::payslip_manager::send_payslip_manager_email,
+            commands::payslip_portal_publish::publish_final_payslips_to_portal,
             commands::payslip_delivery::list_payslip_delivery_queue,
             commands::payslip_delivery::update_payslip_delivery_status,
             commands::payslip_delivery::send_payslip_email

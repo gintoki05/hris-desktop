@@ -102,6 +102,11 @@ pub struct PayslipSnapshot {
     pub email_sent_at: Option<String>,
     pub email_failed_at: Option<String>,
     pub email_error_message: String,
+    pub portal_publish_status: String,
+    pub portal_published_at: Option<String>,
+    pub portal_storage_path: String,
+    pub portal_payslip_id: String,
+    pub portal_error_message: String,
     pub status_updated_at: String,
     pub created_at: String,
     pub updated_at: String,
@@ -388,6 +393,8 @@ pub fn list_payslip_snapshots(
             net_pay, pdf_file_path, send_status, whatsapp_status, email_status,
             whatsapp_opened_at, whatsapp_sent_at, whatsapp_failed_at,
             email_sent_at, email_failed_at, email_error_message,
+            portal_publish_status, portal_published_at, portal_storage_path,
+            portal_payslip_id, portal_error_message,
             status_updated_at, created_at, updated_at
         FROM payslip_snapshots
         WHERE period_id = ?1
@@ -714,9 +721,14 @@ fn payslip_snapshot_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Paysli
         email_sent_at: row.get(17)?,
         email_failed_at: row.get(18)?,
         email_error_message: row.get(19)?,
-        status_updated_at: row.get(20)?,
-        created_at: row.get(21)?,
-        updated_at: row.get(22)?,
+        portal_publish_status: row.get(20)?,
+        portal_published_at: row.get(21)?,
+        portal_storage_path: row.get(22)?,
+        portal_payslip_id: row.get(23)?,
+        portal_error_message: row.get(24)?,
+        status_updated_at: row.get(25)?,
+        created_at: row.get(26)?,
+        updated_at: row.get(27)?,
     })
 }
 

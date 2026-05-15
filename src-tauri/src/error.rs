@@ -5,6 +5,7 @@ pub enum AppError {
     Database(String),
     FileSystem(String),
     Path(String),
+    Supabase(String),
 }
 
 impl AppError {
@@ -13,6 +14,7 @@ impl AppError {
             Self::Database(message) => format!("Database lokal gagal diproses: {message}"),
             Self::FileSystem(message) => format!("File lokal gagal diproses: {message}"),
             Self::Path(message) => format!("Path lokal tidak valid: {message}"),
+            Self::Supabase(message) => format!("Publish Supabase gagal: {message}"),
         }
     }
 }

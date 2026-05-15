@@ -7,6 +7,7 @@ pub mod organization_master_service;
 pub mod payslip_delivery_service;
 pub mod payslip_manager_service;
 pub mod payslip_pdf_logo;
+pub mod payslip_portal_publish_service;
 pub mod payroll_service;
 pub mod settings_service;
 pub mod work_schedule_service;

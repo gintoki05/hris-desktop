@@ -6,6 +6,7 @@ pub mod employees;
 pub mod organization_master;
 pub mod payslip_delivery;
 pub mod payslip_manager;
+pub mod payslip_portal_publish;
 pub mod payroll;
 pub mod settings;
 pub mod work_schedules;

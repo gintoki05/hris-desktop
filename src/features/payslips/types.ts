@@ -73,6 +73,7 @@ export type PayslipSendStatus =
 
 export type PayslipManagerWhatsappStatus = "not_opened" | "opened" | "sent_manual" | "failed" | "missing_number";
 export type PayslipManagerEmailStatus = "not_sent" | "sent" | "failed" | "missing_email";
+export type PayslipPortalPublishStatus = "not_published" | "published" | "failed";
 
 export type PayslipImportSnapshotInput = {
   id?: string;
@@ -128,9 +129,30 @@ export type PayslipManagerSnapshot = {
   emailSentAt: string | null;
   emailFailedAt: string | null;
   emailErrorMessage: string;
+  portalPublishStatus: PayslipPortalPublishStatus;
+  portalPublishedAt: string | null;
+  portalStoragePath: string;
+  portalPayslipId: string;
+  portalErrorMessage: string;
   statusUpdatedAt: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PayslipPortalPublishResult = {
+  periodId: string;
+  attemptedCount: number;
+  publishedCount: number;
+  failedCount: number;
+  items: PayslipPortalPublishItemResult[];
+};
+
+export type PayslipPortalPublishItemResult = {
+  snapshotId: string;
+  employeeName: string;
+  status: "published" | "failed";
+  storagePath: string;
+  errorMessage: string;
 };
 
 export type PayslipImportPreviewRowStatus = "valid" | "warning" | "error";

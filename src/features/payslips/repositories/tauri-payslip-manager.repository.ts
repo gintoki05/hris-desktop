@@ -3,6 +3,7 @@ import type {
   PayslipImportBatch,
   PayslipImportBatchInput,
   PayslipManagerSnapshot,
+  PayslipPortalPublishResult,
   PayslipPeriod,
   PayslipPeriodInput,
   PayslipSendStatus,
@@ -63,9 +64,30 @@ type PayslipSnapshotDto = {
   email_sent_at: string | null;
   email_failed_at: string | null;
   email_error_message: string;
+  portal_publish_status: PayslipManagerSnapshot["portalPublishStatus"];
+  portal_published_at: string | null;
+  portal_storage_path: string;
+  portal_payslip_id: string;
+  portal_error_message: string;
   status_updated_at: string;
   created_at: string;
   updated_at: string;
+};
+
+type PayslipPortalPublishResultDto = {
+  period_id: string;
+  attempted_count: number;
+  published_count: number;
+  failed_count: number;
+  items: PayslipPortalPublishItemResultDto[];
+};
+
+type PayslipPortalPublishItemResultDto = {
+  snapshot_id: string;
+  employee_name: string;
+  status: "published" | "failed";
+  storage_path: string;
+  error_message: string;
 };
 
 export async function listPayslipPeriods(): Promise<PayslipPeriod[]> {
@@ -182,6 +204,33 @@ export async function sendPayslipManagerEmail(
   return toSnapshot(dto);
 }
 
+export async function publishFinalPayslipsToPortal(
+  periodId: string,
+  actor: PayslipManagerActor,
+): Promise<PayslipPortalPublishResult> {
+  ensureTauriRuntime();
+  const dto = await invoke<PayslipPortalPublishResultDto>("publish_final_payslips_to_portal", {
+    input: {
+      period_id: periodId,
+      actor: toActorDto(actor),
+    },
+  });
+
+  return {
+    periodId: dto.period_id,
+    attemptedCount: dto.attempted_count,
+    publishedCount: dto.published_count,
+    failedCount: dto.failed_count,
+    items: dto.items.map((item) => ({
+      snapshotId: item.snapshot_id,
+      employeeName: item.employee_name,
+      status: item.status,
+      storagePath: item.storage_path,
+      errorMessage: item.error_message,
+    })),
+  };
+}
+
 export async function exportPayslipTemplateFile(
   targetPath: string,
   bytes: number[],
@@ -253,6 +302,11 @@ function toSnapshot(dto: PayslipSnapshotDto): PayslipManagerSnapshot {
     emailSentAt: dto.email_sent_at,
     emailFailedAt: dto.email_failed_at,
     emailErrorMessage: dto.email_error_message,
+    portalPublishStatus: dto.portal_publish_status,
+    portalPublishedAt: dto.portal_published_at,
+    portalStoragePath: dto.portal_storage_path,
+    portalPayslipId: dto.portal_payslip_id,
+    portalErrorMessage: dto.portal_error_message,
     statusUpdatedAt: dto.status_updated_at,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,

@@ -699,6 +699,22 @@ const MIGRATIONS: &[Migration] = &[
         PRAGMA writable_schema = OFF;
     ",
     },
+    Migration {
+        id: "202605150001_portal_payslip_publish",
+        sql: "
+        ALTER TABLE employees ADD COLUMN portal_user_id TEXT NOT NULL DEFAULT '';
+
+        ALTER TABLE payslip_snapshots ADD COLUMN portal_publish_status TEXT NOT NULL DEFAULT 'not_published'
+            CHECK (portal_publish_status IN ('not_published', 'published', 'failed'));
+        ALTER TABLE payslip_snapshots ADD COLUMN portal_published_at TEXT;
+        ALTER TABLE payslip_snapshots ADD COLUMN portal_storage_path TEXT NOT NULL DEFAULT '';
+        ALTER TABLE payslip_snapshots ADD COLUMN portal_payslip_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE payslip_snapshots ADD COLUMN portal_error_message TEXT NOT NULL DEFAULT '';
+
+        CREATE INDEX IF NOT EXISTS idx_payslip_snapshots_portal_publish_status
+            ON payslip_snapshots(portal_publish_status);
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {

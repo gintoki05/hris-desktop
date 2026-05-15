@@ -17,6 +17,7 @@ type EmployeeDto = {
   nik: string;
   whatsapp_number: string;
   email: string;
+  portal_user_id: string;
   name: string;
   hire_date: string;
   npwp: string;
@@ -118,6 +119,7 @@ function toEmployee(dto: EmployeeDto): Employee {
     nik: dto.nik,
     whatsappNumber: dto.whatsapp_number,
     email: dto.email,
+    portalUserId: dto.portal_user_id,
     name: dto.name,
     hireDate: dto.hire_date,
     npwp: dto.npwp,
@@ -141,6 +143,7 @@ function toEmployeeInputDto(input: EmployeeInput): EmployeeInputDto {
     nik: input.nik,
     whatsapp_number: input.whatsappNumber,
     email: input.email,
+    portal_user_id: input.portalUserId,
     name: input.name,
     hire_date: input.hireDate,
     npwp: input.npwp,

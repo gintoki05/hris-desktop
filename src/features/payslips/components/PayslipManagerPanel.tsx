@@ -28,6 +28,7 @@ import {
   generatePayslipPdfs,
   listPayslipPeriods,
   listPayslipSnapshots,
+  publishFinalPayslipsToPortal,
   updatePayslipSnapshotSendStatus,
 } from "../services/payslip-manager.service";
 import {
@@ -59,6 +60,12 @@ const WHATSAPP_STATUS_LABELS: Record<PayslipManagerSnapshot["whatsappStatus"], s
   sent_manual: "Terkirim manual",
 };
 
+const PORTAL_STATUS_LABELS: Record<PayslipManagerSnapshot["portalPublishStatus"], string> = {
+  failed: "Gagal",
+  not_published: "Belum",
+  published: "Published",
+};
+
 const PERIOD_PAGE_SIZE = 5;
 
 export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelProps) {
@@ -69,6 +76,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(true);
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
   const [isRegeneratingPdf, setIsRegeneratingPdf] = useState(false);
+  const [isPublishingPortal, setIsPublishingPortal] = useState(false);
   const [updatingSnapshotId, setUpdatingSnapshotId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -107,6 +115,8 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       pdfReady: snapshots.filter((snapshot) => snapshot.pdfFilePath.trim()).length,
       whatsappSent: snapshots.filter((snapshot) => snapshot.whatsappStatus === "sent_manual").length,
       undelivered: snapshots.filter((snapshot) => snapshot.whatsappStatus !== "sent_manual").length,
+      portalPublished: snapshots.filter((snapshot) => snapshot.portalPublishStatus === "published").length,
+      portalFailed: snapshots.filter((snapshot) => snapshot.portalPublishStatus === "failed").length,
     }),
     [snapshots],
   );
@@ -115,6 +125,12 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     && snapshots.length > 0
     && !isLoadingSnapshots
     && !isRegeneratingPdf;
+  const canPublishPortal = canEdit
+    && selectedPeriod?.status === "pdf_ready"
+    && snapshots.length > 0
+    && summary.pdfReady === snapshots.length
+    && !isLoadingSnapshots
+    && !isPublishingPortal;
 
   async function refreshPeriods() {
     setIsLoadingPeriods(true);
@@ -166,6 +182,34 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       setErrorMessage(getErrorMessage(error, "PDF slip gagal dibuat ulang."));
     } finally {
       setIsRegeneratingPdf(false);
+    }
+  }
+
+  async function handlePublishPortal() {
+    if (!selectedPeriod || !canPublishPortal) {
+      return;
+    }
+
+    setIsPublishingPortal(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await publishFinalPayslipsToPortal(selectedPeriod.id, session);
+      await refreshSnapshots(selectedPeriod.id);
+      setSuccessMessage(
+        `Publish portal selesai: ${result.publishedCount} berhasil, ${result.failedCount} gagal.`,
+      );
+      if (result.failedCount > 0) {
+        const firstFailure = result.items.find((item) => item.status === "failed");
+        setErrorMessage(firstFailure
+          ? `Sebagian publish gagal. Contoh: ${firstFailure.employeeName} - ${firstFailure.errorMessage}`
+          : "Sebagian publish gagal. Buka status Portal di tabel untuk detail.");
+      }
+    } catch (error: unknown) {
+      setErrorMessage(getErrorMessage(error, "Publish slip ke portal gagal."));
+    } finally {
+      setIsPublishingPortal(false);
     }
   }
 
@@ -372,6 +416,8 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
             <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
             <span>Belum terkirim WA: <strong>{summary.undelivered}</strong></span>
+            <span>Portal: <strong>{summary.portalPublished}</strong></span>
+            <span>Portal gagal: <strong>{summary.portalFailed}</strong></span>
             <Button
               disabled={!canRegeneratePdf}
               onClick={() => void handleRegeneratePdf()}
@@ -380,6 +426,15 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
               variant="outline"
             >
               {isRegeneratingPdf ? "Membuat ulang..." : "Buat Ulang PDF Periode"}
+            </Button>
+            <Button
+              disabled={!canPublishPortal}
+              onClick={() => void handlePublishPortal()}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              {isPublishingPortal ? "Publishing..." : "Publish ke Portal"}
             </Button>
           </div>
 
@@ -392,6 +447,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                   <TableHead>WhatsApp</TableHead>
                   <TableHead>Gaji Bersih</TableHead>
                   <TableHead>PDF</TableHead>
+                  <TableHead>Portal</TableHead>
                   <TableHead>WA</TableHead>
                   <TableHead>Aksi</TableHead>
                 </TableRow>
@@ -406,6 +462,14 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                     <TableCell>{snapshot.whatsappNumber ? maskWhatsAppNumber(snapshot.whatsappNumber) : "-"}</TableCell>
                     <TableCell>{formatRupiah(snapshot.netPay)}</TableCell>
                     <TableCell><FileNameCell path={snapshot.pdfFilePath} /></TableCell>
+                    <TableCell>
+                      <StatusBadge>{PORTAL_STATUS_LABELS[snapshot.portalPublishStatus]}</StatusBadge>
+                      {snapshot.portalErrorMessage ? (
+                        <span className="mt-1 block max-w-48 truncate text-xs text-destructive">
+                          {snapshot.portalErrorMessage}
+                        </span>
+                      ) : null}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge>{WHATSAPP_STATUS_LABELS[snapshot.whatsappStatus]}</StatusBadge>
                     </TableCell>
@@ -472,12 +536,12 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
                 ))}
                 {!isLoadingSnapshots && selectedPeriod && snapshots.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>Belum ada slip karyawan untuk periode ini. Finalisasi payroll dulu.</TableCell>
+                    <TableCell colSpan={7}>Belum ada slip karyawan untuk periode ini. Finalisasi payroll dulu.</TableCell>
                   </TableRow>
                 ) : null}
                 {!isLoadingSnapshots && !selectedPeriod ? (
                   <TableRow>
-                    <TableCell colSpan={6}>Pilih periode payroll final terlebih dahulu.</TableCell>
+                    <TableCell colSpan={7}>Pilih periode payroll final terlebih dahulu.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>

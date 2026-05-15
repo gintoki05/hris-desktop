@@ -26,6 +26,7 @@ import { WorkSchedulePanel } from "./features/attendance/components/WorkSchedule
 import { LoginPanel } from "./features/auth/components/LoginPanel";
 import { useAuthSession } from "./features/auth/hooks/useAuthSession";
 import type { AuthPermission } from "./features/auth/types";
+import { BackupRestorePanel } from "./features/backup/components/BackupRestorePanel";
 import { EmployeeMasterPanel } from "./features/employees/components/EmployeeMasterPanel";
 import { OrganizationMasterPanel } from "./features/organization/components/OrganizationMasterPanel";
 import { PayslipManagerPanel } from "./features/payslips/components/PayslipManagerPanel";
@@ -306,9 +307,9 @@ function App() {
       ) : null}
 
       {activePage === "backup" ? (
-        <PlaceholderPanel
-          description="Halaman backup dan restore akan menangani safety copy sebelum operasi restore atau perubahan destruktif."
-          title="Backup & restore belum diimplementasikan"
+        <BackupRestorePanel
+          canEdit={auth.can("backup:manage")}
+          databaseStatus={status?.database ?? null}
         />
       ) : null}
     </AdminLayout>

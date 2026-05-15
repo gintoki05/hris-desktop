@@ -310,7 +310,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
 
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2 pt-2">
               <Button disabled={disabled || !settingsChanged(settings, draft)} onClick={handleSave} type="button">
                 {isSaving ? "Menyimpan..." : "Simpan Setting"}
               </Button>

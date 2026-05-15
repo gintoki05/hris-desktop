@@ -4,6 +4,7 @@ import {
   generatePayslipPdfs as generatePdfsWithRepository,
   listPayslipPeriods as listPeriodsWithRepository,
   listPayslipSnapshots as listSnapshotsWithRepository,
+  publishFinalPayslipsToPortal as publishToPortalWithRepository,
   savePayslipImportBatch as saveImportBatchWithRepository,
   savePayslipPeriod as savePeriodWithRepository,
   sendPayslipManagerEmail as sendEmailWithRepository,
@@ -13,6 +14,7 @@ import type {
   PayslipImportBatch,
   PayslipImportBatchInput,
   PayslipManagerSnapshot,
+  PayslipPortalPublishResult,
   PayslipPeriod,
   PayslipPeriodInput,
   PayslipSendStatus,
@@ -61,6 +63,13 @@ export function sendPayslipManagerEmail(
   session: AuthSession,
 ): Promise<PayslipManagerSnapshot> {
   return sendEmailWithRepository(snapshotId, toActor(session));
+}
+
+export function publishFinalPayslipsToPortal(
+  periodId: string,
+  session: AuthSession,
+): Promise<PayslipPortalPublishResult> {
+  return publishToPortalWithRepository(periodId, toActor(session));
 }
 
 export function exportPayslipTemplateFile(

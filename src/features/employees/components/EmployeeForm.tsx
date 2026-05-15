@@ -125,6 +125,24 @@ export function EmployeeForm({
 
         <div className="settings-two-columns">
           <label>
+            Portal user ID
+            <Input
+              maxLength={80}
+              onChange={(event) => onUpdateDraft("portalUserId", event.target.value)}
+              placeholder="UUID user Supabase Auth"
+              value={draft.portalUserId}
+            />
+            <span className="field-help">
+              Wajib untuk publish slip ke Employee Self-Service Portal.
+            </span>
+          </label>
+          <span className="field-help employee-field-note">
+            Simpan ID akun portal, bukan service role key. Jangan isi dengan NIK, NPWP, atau nomor HP.
+          </span>
+        </div>
+
+        <div className="settings-two-columns">
+          <label>
             <span className="field-label">
               Tanggal mulai kerja <span className="required-label">Wajib</span>
             </span>
@@ -370,7 +388,7 @@ export function EmployeeForm({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
         <Button disabled={disabled} type="submit">
           {isSaving ? "Menyimpan..." : selectedEmployee ? "Simpan Perubahan" : "Simpan Karyawan"}
         </Button>

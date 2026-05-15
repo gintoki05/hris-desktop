@@ -12,6 +12,7 @@ pub struct Employee {
     pub nik: String,
     pub whatsapp_number: String,
     pub email: String,
+    pub portal_user_id: String,
     pub name: String,
     pub hire_date: String,
     pub npwp: String,
@@ -47,6 +48,7 @@ pub struct EmployeeInput {
     pub nik: String,
     pub whatsapp_number: String,
     pub email: String,
+    pub portal_user_id: String,
     pub name: String,
     pub hire_date: String,
     pub npwp: String,
@@ -75,7 +77,7 @@ pub fn list_employees(
     let sql = if filter.include_inactive {
         "
         SELECT
-            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            id, nik, whatsapp_number, email, portal_user_id, name, hire_date, npwp, marital_status, dependents, department,
             position, status, employment_type, payment_method,
             salary_amount, pph21_enabled, shift_type, work_schedule, updated_at
         FROM employees
@@ -89,7 +91,7 @@ pub fn list_employees(
     } else {
         "
         SELECT
-            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            id, nik, whatsapp_number, email, portal_user_id, name, hire_date, npwp, marital_status, dependents, department,
             position, status, employment_type, payment_method,
             salary_amount, pph21_enabled, shift_type, work_schedule, updated_at
         FROM employees
@@ -134,12 +136,12 @@ pub fn create_employee(
         INSERT INTO employees (
             id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
             position, status, employment_type, salary_amount, payment_method,
-            pph21_enabled, shift_type, work_schedule, created_at, updated_at
+            pph21_enabled, shift_type, work_schedule, portal_user_id, created_at, updated_at
         )
         VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
             ?11, ?12, ?13, ?14,
-            ?15, ?16, ?17, ?18, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+            ?15, ?16, ?17, ?18, ?19, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         )
         ",
         params![
@@ -161,6 +163,7 @@ pub fn create_employee(
             if employee.pph21_enabled { 1 } else { 0 },
             &employee.shift_type,
             &employee.work_schedule,
+            &employee.portal_user_id,
         ],
     )?;
     transaction.commit()?;
@@ -192,6 +195,7 @@ pub fn update_employee(
             nik = ?1,
             whatsapp_number = ?2,
             email = ?3,
+            portal_user_id = ?19,
             name = ?4,
             hire_date = ?5,
             npwp = ?6,
@@ -228,6 +232,7 @@ pub fn update_employee(
             &employee.shift_type,
             &employee.work_schedule,
             &employee.id,
+            &employee.portal_user_id,
         ],
     )?;
     transaction.commit()?;
@@ -271,7 +276,7 @@ fn get_employee_by_id(app: &AppHandle, id: &str) -> Result<Option<Employee>, App
         .query_row(
             "
             SELECT
-            id, nik, whatsapp_number, email, name, hire_date, npwp, marital_status, dependents, department,
+            id, nik, whatsapp_number, email, portal_user_id, name, hire_date, npwp, marital_status, dependents, department,
             position, status, employment_type, payment_method,
             salary_amount, pph21_enabled, shift_type, work_schedule, updated_at
             FROM employees
@@ -285,28 +290,29 @@ fn get_employee_by_id(app: &AppHandle, id: &str) -> Result<Option<Employee>, App
 }
 
 fn employee_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Employee> {
-    let pph21_enabled: i32 = row.get(15)?;
+    let pph21_enabled: i32 = row.get(16)?;
 
     Ok(Employee {
         id: row.get(0)?,
         nik: row.get(1)?,
         whatsapp_number: row.get(2)?,
         email: row.get(3)?,
-        name: row.get(4)?,
-        hire_date: row.get(5)?,
-        npwp: row.get(6)?,
-        marital_status: row.get(7)?,
-        dependents: row.get(8)?,
-        department: row.get(9)?,
-        position: row.get(10)?,
-        status: row.get(11)?,
-        employment_type: row.get(12)?,
-        payment_method: row.get(13)?,
-        salary_amount: row.get(14)?,
+        portal_user_id: row.get(4)?,
+        name: row.get(5)?,
+        hire_date: row.get(6)?,
+        npwp: row.get(7)?,
+        marital_status: row.get(8)?,
+        dependents: row.get(9)?,
+        department: row.get(10)?,
+        position: row.get(11)?,
+        status: row.get(12)?,
+        employment_type: row.get(13)?,
+        payment_method: row.get(14)?,
+        salary_amount: row.get(15)?,
         pph21_enabled: pph21_enabled == 1,
-        shift_type: row.get(16)?,
-        work_schedule: row.get(17)?,
-        updated_at: row.get(18)?,
+        shift_type: row.get(17)?,
+        work_schedule: row.get(18)?,
+        updated_at: row.get(19)?,
     })
 }
 
@@ -316,6 +322,7 @@ fn normalize_employee_input(id: String, input: EmployeeInput) -> Result<Employee
         nik: input.nik.trim().to_string(),
         whatsapp_number: input.whatsapp_number.trim().to_string(),
         email: input.email.trim().to_lowercase(),
+        portal_user_id: input.portal_user_id.trim().to_string(),
         name: input.name.trim().to_string(),
         hire_date: input.hire_date.trim().to_string(),
         npwp: input.npwp.trim().to_string(),

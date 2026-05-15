@@ -183,7 +183,7 @@ export function OrganizationMasterPanel({ canEdit, session }: OrganizationMaster
             onUpdate={(index, patch) => updateItem("positions", index, patch)}
           />
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2 pt-2">
             <Button disabled={disabled || !masterChanged(masterData, draft)} onClick={handleSave} type="button">
               {isSaving ? "Menyimpan..." : "Simpan Master Referensi"}
             </Button>

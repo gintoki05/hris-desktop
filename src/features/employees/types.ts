@@ -13,6 +13,7 @@ export type Employee = {
   nik: string;
   whatsappNumber: string;
   email: string;
+  portalUserId: string;
   name: string;
   hireDate: string;
   position: string;
@@ -34,6 +35,7 @@ export type EmployeeInput = {
   nik: string;
   whatsappNumber: string;
   email: string;
+  portalUserId: string;
   name: string;
   hireDate: string;
   npwp: string;
