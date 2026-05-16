@@ -7,6 +7,7 @@ export type AuthPermission =
   | "payroll:manage"
   | "reports:view"
   | "payslips:view"
+  | "portal-ess:manage"
   | "backup:manage";
 
 export type AuthUser = {

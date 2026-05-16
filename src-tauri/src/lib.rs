@@ -39,6 +39,10 @@ pub fn run() {
             commands::payslip_manager::generate_payslip_pdfs,
             commands::payslip_manager::send_payslip_manager_email,
             commands::payslip_portal_publish::publish_final_payslips_to_portal,
+            commands::payslip_portal_publish::list_payslip_portal_status,
+            commands::payslip_portal_publish::link_employee_portal_user,
+            commands::payslip_portal_publish::list_employee_portal_status,
+            commands::payslip_portal_publish::create_employee_portal_account,
             commands::payslip_delivery::list_payslip_delivery_queue,
             commands::payslip_delivery::update_payslip_delivery_status,
             commands::payslip_delivery::send_payslip_email

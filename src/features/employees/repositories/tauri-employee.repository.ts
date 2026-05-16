@@ -5,6 +5,7 @@ import type {
   EmployeeActor,
   EmployeeInput,
   EmployeeListFilter,
+  EmployeePortalLinkResult,
   EmployeeStatus,
   EmploymentType,
   MaritalStatus,
@@ -46,6 +47,14 @@ type EmployeeActorDto = {
 type EmployeeListFilterDto = {
   query: string | null;
   include_inactive: boolean;
+};
+
+type EmployeePortalLinkResultDto = {
+  employee_id: string;
+  employee_name: string;
+  employee_email: string;
+  portal_user_id: string;
+  employee_profile_id: string;
 };
 
 const browserPreviewEmployees: Employee[] = [];
@@ -111,6 +120,17 @@ export const tauriEmployeeRepository: EmployeeRepository = {
     });
     return toEmployee(dto);
   },
+
+  async linkEmployeePortalUser(id, actor) {
+    ensureTauriRuntime();
+    const dto = await invoke<EmployeePortalLinkResultDto>("link_employee_portal_user", {
+      input: {
+        employee_id: id,
+        actor: toEmployeeActorDto(actor),
+      },
+    });
+    return toEmployeePortalLinkResult(dto);
+  },
 };
 
 function toEmployee(dto: EmployeeDto): Employee {
@@ -158,6 +178,16 @@ function toEmployeeInputDto(input: EmployeeInput): EmployeeInputDto {
     pph21_enabled: input.pph21Enabled,
     shift_type: input.shiftType,
     work_schedule: input.workSchedule,
+  };
+}
+
+function toEmployeePortalLinkResult(dto: EmployeePortalLinkResultDto): EmployeePortalLinkResult {
+  return {
+    employeeId: dto.employee_id,
+    employeeName: dto.employee_name,
+    employeeEmail: dto.employee_email,
+    portalUserId: dto.portal_user_id,
+    employeeProfileId: dto.employee_profile_id,
   };
 }
 

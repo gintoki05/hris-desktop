@@ -131,7 +131,6 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     && summary.pdfReady === snapshots.length
     && !isLoadingSnapshots
     && !isPublishingPortal;
-
   async function refreshPeriods() {
     setIsLoadingPeriods(true);
     setErrorMessage(null);

@@ -30,6 +30,7 @@ import {
 import {
   createEmployee,
   deactivateEmployee,
+  getEmployeeById,
   listEmployees,
   updateEmployee,
 } from "../services/employee.service";
@@ -37,12 +38,13 @@ import type { Employee, EmployeeActor, EmployeeInput } from "../types";
 
 type EmployeeMasterPanelProps = {
   canEdit: boolean;
+  openEmployeeRequest?: { employeeId: string; requestId: number } | null;
   session: AuthSession;
 };
 
 const EMPLOYEE_PAGE_SIZE = 5;
 
-export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelProps) {
+export function EmployeeMasterPanel({ canEdit, openEmployeeRequest, session }: EmployeeMasterPanelProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [organizationMaster, setOrganizationMaster] = useState<OrganizationMasterData>({
     departments: [],
@@ -145,6 +147,58 @@ export function EmployeeMasterPanel({ canEdit, session }: EmployeeMasterPanelPro
       isMounted = false;
     };
   }, [includeInactive, query]);
+
+  useEffect(() => {
+    if (!openEmployeeRequest) {
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoading(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    getEmployeeById(openEmployeeRequest.employeeId)
+      .then(async (employee) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (!employee) {
+          setErrorMessage("Data karyawan tidak ditemukan.");
+          return;
+        }
+
+        const nextIncludeInactive = employee.status === "inactive";
+        const nextEmployees = await listEmployees({ query: "", includeInactive: nextIncludeInactive });
+        if (!isMounted) {
+          return;
+        }
+
+        const employeeIndex = nextEmployees.findIndex((item) => item.id === employee.id);
+        setQuery("");
+        setIncludeInactive(nextIncludeInactive);
+        setEmployees(nextEmployees);
+        setCurrentPage(employeeIndex >= 0 ? Math.floor(employeeIndex / EMPLOYEE_PAGE_SIZE) + 1 : 1);
+        setSelectedEmployeeId(employee.id);
+        setDraft(toEmployeeInput(employee));
+        setIsEmployeeModalOpen(true);
+      })
+      .catch((error: unknown) => {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : "Detail karyawan gagal dibuka.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [openEmployeeRequest?.employeeId, openEmployeeRequest?.requestId]);
 
   async function refreshEmployees(nextSelectedId?: string | null, nextIncludeInactive = includeInactive) {
     const nextEmployees = await listEmployees({ query, includeInactive: nextIncludeInactive });

@@ -628,20 +628,16 @@ h1 {
 }
 
 .field-label {
-  align-items: center;
+  align-items: baseline;
   display: flex;
-  gap: 7px;
+  gap: 3px;
 }
 
 .required-label {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 999px;
-  color: #8a3b12;
-  font-size: 11px;
+  color: #dc2626;
+  font-size: 13px;
   font-weight: 750;
   line-height: 1;
-  padding: 4px 7px;
 }
 
 .settings-fieldset input,
@@ -2520,8 +2516,7 @@ h1 {
   letter-spacing: 0;
 }
 
-.status-pill,
-.required-label {
+.status-pill {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 750;

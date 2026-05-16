@@ -4,6 +4,7 @@ import type {
   PayslipImportBatchInput,
   PayslipManagerSnapshot,
   PayslipPortalPublishResult,
+  PayslipPortalStatusResult,
   PayslipPeriod,
   PayslipPeriodInput,
   PayslipSendStatus,
@@ -87,6 +88,25 @@ type PayslipPortalPublishItemResultDto = {
   employee_name: string;
   status: "published" | "failed";
   storage_path: string;
+  error_message: string;
+};
+
+type PayslipPortalStatusResultDto = {
+  period_id: string;
+  items: PayslipPortalStatusItemDto[];
+};
+
+type PayslipPortalStatusItemDto = {
+  snapshot_id: string;
+  employee_name: string;
+  employee_email: string;
+  auth_user_status: "found" | "missing";
+  employee_profile_status: "found" | "missing";
+  payslip_status: "published" | "missing";
+  portal_user_id: string;
+  employee_profile_id: string;
+  portal_payslip_id: string;
+  published_at: string | null;
   error_message: string;
 };
 
@@ -226,6 +246,36 @@ export async function publishFinalPayslipsToPortal(
       employeeName: item.employee_name,
       status: item.status,
       storagePath: item.storage_path,
+      errorMessage: item.error_message,
+    })),
+  };
+}
+
+export async function listPayslipPortalStatus(
+  periodId: string,
+  actor: PayslipManagerActor,
+): Promise<PayslipPortalStatusResult> {
+  ensureTauriRuntime();
+  const dto = await invoke<PayslipPortalStatusResultDto>("list_payslip_portal_status", {
+    input: {
+      period_id: periodId,
+      actor: toActorDto(actor),
+    },
+  });
+
+  return {
+    periodId: dto.period_id,
+    items: dto.items.map((item) => ({
+      snapshotId: item.snapshot_id,
+      employeeName: item.employee_name,
+      employeeEmail: item.employee_email,
+      authUserStatus: item.auth_user_status,
+      employeeProfileStatus: item.employee_profile_status,
+      payslipStatus: item.payslip_status,
+      portalUserId: item.portal_user_id,
+      employeeProfileId: item.employee_profile_id,
+      portalPayslipId: item.portal_payslip_id,
+      publishedAt: item.published_at,
       errorMessage: item.error_message,
     })),
   };

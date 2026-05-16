@@ -1,4 +1,4 @@
-import type { Employee, EmployeeActor, EmployeeInput, EmployeeListFilter } from "../types";
+import type { Employee, EmployeeActor, EmployeeInput, EmployeeListFilter, EmployeePortalLinkResult } from "../types";
 
 export type EmployeeRepository = {
   listEmployees: (filter: EmployeeListFilter) => Promise<Employee[]>;
@@ -7,4 +7,5 @@ export type EmployeeRepository = {
   createEmployee: (input: EmployeeInput, actor: EmployeeActor) => Promise<Employee>;
   updateEmployee: (id: string, input: EmployeeInput, actor: EmployeeActor) => Promise<Employee>;
   deactivateEmployee: (id: string, actor: EmployeeActor) => Promise<Employee>;
+  linkEmployeePortalUser: (id: string, actor: EmployeeActor) => Promise<EmployeePortalLinkResult>;
 };

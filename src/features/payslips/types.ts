@@ -155,6 +155,25 @@ export type PayslipPortalPublishItemResult = {
   errorMessage: string;
 };
 
+export type PayslipPortalStatusResult = {
+  periodId: string;
+  items: PayslipPortalStatusItem[];
+};
+
+export type PayslipPortalStatusItem = {
+  snapshotId: string;
+  employeeName: string;
+  employeeEmail: string;
+  authUserStatus: "found" | "missing";
+  employeeProfileStatus: "found" | "missing";
+  payslipStatus: "published" | "missing";
+  portalUserId: string;
+  employeeProfileId: string;
+  portalPayslipId: string;
+  publishedAt: string | null;
+  errorMessage: string;
+};
+
 export type PayslipImportPreviewRowStatus = "valid" | "warning" | "error";
 
 export type PayslipImportPreviewRow = {

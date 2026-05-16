@@ -62,3 +62,11 @@ export type EmployeeActor = {
   displayName: string;
   role: string;
 };
+
+export type EmployeePortalLinkResult = {
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  portalUserId: string;
+  employeeProfileId: string;
+};

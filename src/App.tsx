@@ -31,6 +31,7 @@ import { EmployeeMasterPanel } from "./features/employees/components/EmployeeMas
 import { OrganizationMasterPanel } from "./features/organization/components/OrganizationMasterPanel";
 import { PayslipManagerPanel } from "./features/payslips/components/PayslipManagerPanel";
 import { ManualPayrollPanel } from "./features/payroll/components/ManualPayrollPanel";
+import { PortalEssPanel } from "./features/portal-ess/components/PortalEssPanel";
 import { FoundationStatusPanel } from "./features/settings/components/FoundationStatusPanel";
 import { MasterSettingsPanel } from "./features/settings/components/MasterSettingsPanel";
 import { getFoundationStatus } from "./features/settings/services/foundation.service";
@@ -53,6 +54,7 @@ function App() {
   const auth = useAuthSession();
   const [activePage, setActivePage] = useState<AdminPage>("dashboard");
   const [activeMasterDataTab, setActiveMasterDataTab] = useState<MasterDataTab>("settings");
+  const [employeeDetailRequest, setEmployeeDetailRequest] = useState<{ employeeId: string; requestId: number } | null>(null);
   const [status, setStatus] = useState<FoundationStatus | null>(null);
   const [masterSettings, setMasterSettings] = useState<MasterSettings | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -145,6 +147,7 @@ function App() {
       "master-data": "Master Data",
       payroll: "Payroll",
       payslips: "Slip PDF",
+      "portal-ess": "Portal ESS",
       reports: "Laporan",
     };
 
@@ -159,6 +162,7 @@ function App() {
       "master-data": "Kelola data dasar perusahaan, karyawan, shift, kode absensi, dan aturan lembur.",
       payroll: "Hitung payroll dari snapshot absensi dan master payroll yang sudah tervalidasi.",
       payslips: "Kelola periode slip, daftar slip karyawan, PDF massal, dan status kirim WhatsApp manual.",
+      "portal-ess": "Kelola akun login karyawan dan sinkronisasi profile Employee Self-Service Portal.",
       reports: "Lihat ringkasan payroll dan data manajemen tanpa aksi perubahan.",
     };
 
@@ -173,6 +177,12 @@ function App() {
         onLogin={auth.login}
       />
     );
+  }
+
+  function openEmployeeDetailFromPortal(employeeId: string) {
+    setEmployeeDetailRequest({ employeeId, requestId: Date.now() });
+    setActiveMasterDataTab("employees");
+    setActivePage("master-data");
   }
 
   return (
@@ -251,6 +261,7 @@ function App() {
           <TabsContent value="employees">
             <EmployeeMasterPanel
               canEdit={auth.can("master-data:manage")}
+              openEmployeeRequest={employeeDetailRequest}
               session={auth.session}
             />
           </TabsContent>
@@ -302,6 +313,14 @@ function App() {
       {activePage === "payslips" ? (
         <PayslipManagerPanel
           canEdit={auth.can("payroll:manage")}
+          session={auth.session}
+        />
+      ) : null}
+
+      {activePage === "portal-ess" ? (
+        <PortalEssPanel
+          canManage={auth.can("portal-ess:manage")}
+          onOpenEmployeeDetail={openEmployeeDetailFromPortal}
           session={auth.session}
         />
       ) : null}

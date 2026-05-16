@@ -1,5 +1,6 @@
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
 import { FormattedAmountInput } from "../../../components/shared/FormattedAmountInput";
+import { RequiredFieldLabel } from "../../../components/shared/RequiredFieldLabel";
 import { Button } from "../../../components/ui/button";
 import { Checkbox } from "../../../components/ui/checkbox";
 import { Input } from "../../../components/ui/input";
@@ -74,9 +75,7 @@ export function EmployeeForm({
         </legend>
         <div className="settings-two-columns">
           <label>
-            <span className="field-label">
-              Nama <span className="required-label">Wajib</span>
-            </span>
+            <RequiredFieldLabel>Nama</RequiredFieldLabel>
             <Input
               maxLength={140}
               onChange={(event) => onUpdateDraft("name", event.target.value)}
@@ -85,9 +84,7 @@ export function EmployeeForm({
             />
           </label>
           <label>
-            <span className="field-label">
-              NIK <span className="required-label">Wajib</span>
-            </span>
+            <RequiredFieldLabel>NIK</RequiredFieldLabel>
             <Input
               maxLength={40}
               onChange={(event) => onUpdateDraft("nik", event.target.value)}
@@ -125,27 +122,7 @@ export function EmployeeForm({
 
         <div className="settings-two-columns">
           <label>
-            Portal user ID
-            <Input
-              maxLength={80}
-              onChange={(event) => onUpdateDraft("portalUserId", event.target.value)}
-              placeholder="UUID user Supabase Auth"
-              value={draft.portalUserId}
-            />
-            <span className="field-help">
-              Wajib untuk publish slip ke Employee Self-Service Portal.
-            </span>
-          </label>
-          <span className="field-help employee-field-note">
-            Simpan ID akun portal, bukan service role key. Jangan isi dengan NIK, NPWP, atau nomor HP.
-          </span>
-        </div>
-
-        <div className="settings-two-columns">
-          <label>
-            <span className="field-label">
-              Tanggal mulai kerja <span className="required-label">Wajib</span>
-            </span>
+            <RequiredFieldLabel>Tanggal mulai kerja</RequiredFieldLabel>
             <Input
               onChange={(event) => onUpdateDraft("hireDate", event.target.value)}
               required
@@ -197,9 +174,7 @@ export function EmployeeForm({
 
         <div className="settings-two-columns">
           <label>
-            <span className="field-label">
-              Departemen <span className="required-label">Wajib</span>
-            </span>
+            <RequiredFieldLabel>Departemen</RequiredFieldLabel>
             <Select
               disabled={disabled}
               onValueChange={(value) => onUpdateDraft("department", value)}
@@ -218,9 +193,7 @@ export function EmployeeForm({
             </Select>
           </label>
           <label>
-            <span className="field-label">
-              Jabatan <span className="required-label">Wajib</span>
-            </span>
+            <RequiredFieldLabel>Jabatan</RequiredFieldLabel>
             <Select
               disabled={disabled}
               onValueChange={(value) => onUpdateDraft("position", value)}
@@ -358,9 +331,7 @@ export function EmployeeForm({
             </Select>
           </label>
           <label>
-            <span className="field-label">
-              Jam kerja default <span className="required-label">Wajib</span>
-            </span>
+            <RequiredFieldLabel>Jam kerja default</RequiredFieldLabel>
             <Select
               disabled={disabled}
               onValueChange={(value) => onUpdateDraft("workSchedule", value)}
