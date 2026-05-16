@@ -1,5 +1,5 @@
 import type { AuthRepository } from "./auth.repository";
-import type { AuthRole, AuthSession, AuthUser } from "../types";
+import type { AuthRole, AuthSession, AuthUser, UserManagementItem } from "../types";
 
 type LocalAuthUserRecord = AuthUser & {
   password: string;
@@ -32,8 +32,16 @@ const localUsers: LocalAuthUserRecord[] = [
 ];
 
 export const localAuthRepository: AuthRepository = {
+  async createUser() {
+    throw new Error("Manajemen user hanya bisa disimpan saat aplikasi berjalan sebagai desktop app.");
+  },
+
   async getSession() {
     return readStoredSession();
+  },
+
+  async listUsers() {
+    return localUsers.map(toUserManagementItem);
   },
 
   async login(input) {
@@ -63,6 +71,14 @@ export const localAuthRepository: AuthRepository = {
 
   async logout() {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  },
+
+  async resetUserPassword() {
+    throw new Error("Reset password hanya bisa disimpan saat aplikasi berjalan sebagai desktop app.");
+  },
+
+  async updateUser() {
+    throw new Error("Manajemen user hanya bisa disimpan saat aplikasi berjalan sebagai desktop app.");
   },
 };
 
@@ -112,5 +128,14 @@ function toAuthUser(userRecord: LocalAuthUserRecord): AuthUser {
     username: userRecord.username,
     displayName: userRecord.displayName,
     role: userRecord.role,
+  };
+}
+
+function toUserManagementItem(userRecord: LocalAuthUserRecord): UserManagementItem {
+  return {
+    ...toAuthUser(userRecord),
+    credentialSource: "local_seed",
+    lastLoginAt: null,
+    status: "active",
   };
 }

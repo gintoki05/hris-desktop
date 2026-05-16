@@ -3,6 +3,7 @@ import { DatabaseBackup, FolderOpen, RotateCcw, ShieldCheck } from "lucide-react
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { AppNotice } from "@/components/shared/AppNotice";
 import { FeaturePanel, PanelBody, PanelNote, StatusBadge } from "@/components/shared/FeaturePanel";
+import { PaginationControls } from "@/components/shared/PaginationControls";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +36,11 @@ type BackupRestorePanelProps = {
   databaseStatus: LocalDatabaseStatus | null;
 };
 
+const BACKUP_PAGE_SIZE = 5;
+
 export function BackupRestorePanel({ canEdit, databaseStatus }: BackupRestorePanelProps) {
   const [backups, setBackups] = useState<LocalBackupFile[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,10 +50,19 @@ export function BackupRestorePanel({ canEdit, databaseStatus }: BackupRestorePan
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const backupCountLabel = useMemo(() => `${backups.length} file backup`, [backups.length]);
+  const totalPages = Math.max(1, Math.ceil(backups.length / BACKUP_PAGE_SIZE));
+  const paginatedBackups = useMemo(
+    () => backups.slice((currentPage - 1) * BACKUP_PAGE_SIZE, currentPage * BACKUP_PAGE_SIZE),
+    [backups, currentPage],
+  );
 
   useEffect(() => {
     void refreshBackups();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   async function refreshBackups(): Promise<void> {
     setIsLoading(true);
@@ -73,6 +86,7 @@ export function BackupRestorePanel({ canEdit, databaseStatus }: BackupRestorePan
       const backupPath = await createLocalDatabaseBackup();
       setLastBackupPath(backupPath);
       setSuccessMessage("Backup database berhasil dibuat.");
+      setCurrentPage(1);
       await refreshBackups();
     } catch (error: unknown) {
       setErrorMessage(toErrorMessage(error, "Gagal membuat backup database lokal."));
@@ -185,12 +199,22 @@ export function BackupRestorePanel({ canEdit, databaseStatus }: BackupRestorePan
           ) : null}
 
           <BackupTable
-            backups={backups}
+            backups={paginatedBackups}
             canEdit={canEdit}
             isLoading={isLoading}
             onRevealBackup={handleRevealBackup}
             onSelectRestore={setRestoreCandidate}
           />
+          {backups.length > 0 ? (
+            <PaginationControls
+              ariaLabel="Pagination backup lokal"
+              currentPage={currentPage}
+              itemLabel="file backup"
+              onPageChange={setCurrentPage}
+              pageSize={BACKUP_PAGE_SIZE}
+              totalItems={backups.length}
+            />
+          ) : null}
         </PanelBody>
 
         <PanelNote tone="warning">

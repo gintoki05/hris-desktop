@@ -493,7 +493,7 @@ fn normalize_email_delivery_input(
     };
     let settings = StoredEmailDeliverySettings {
         provider: input.provider.trim().to_string(),
-        enabled: input.enabled,
+        enabled: false,
         resend_api_key: api_key,
         from_name: input.from_name.trim().to_string(),
         from_email: input.from_email.trim().to_lowercase(),

@@ -10,6 +10,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::database::initialize_local_database,
+            commands::auth_users::login_auth_user,
+            commands::auth_users::list_auth_users,
+            commands::auth_users::create_auth_user,
+            commands::auth_users::update_auth_user,
+            commands::auth_users::reset_auth_user_password,
             commands::backup::create_local_database_backup,
             commands::backup::list_local_database_backups,
             commands::backup::restore_local_database_backup,

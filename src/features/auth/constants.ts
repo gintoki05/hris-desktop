@@ -15,6 +15,7 @@ export const ROLE_PERMISSIONS: Record<AuthRole, AuthPermission[]> = {
     "reports:view",
     "payslips:view",
     "portal-ess:manage",
+    "users:manage",
     "backup:manage",
   ],
   owner_management: ["dashboard:view", "reports:view", "payslips:view"],

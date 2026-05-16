@@ -18,6 +18,8 @@ type MasterSettingsPanelProps = {
 
 const LOGO_MAX_SIZE_BYTES = 512 * 1024;
 const LOGO_ACCEPTED_TYPES = ["image/png", "image/jpeg"] as const;
+const EMAIL_DELIVERY_DISABLED_MESSAGE =
+  "Pengiriman email Resend sedang dinonaktifkan sementara. Gunakan pengiriman WhatsApp manual.";
 
 export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: MasterSettingsPanelProps) {
   const [settings, setSettings] = useState<MasterSettings | null>(null);
@@ -36,8 +38,9 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
           return;
         }
 
-        setSettings(nextSettings);
-        setDraft(nextSettings);
+        const disabledEmailSettings = disableEmailDeliveryForSettings(nextSettings);
+        setSettings(disabledEmailSettings);
+        setDraft(disabledEmailSettings);
         setErrorMessage(null);
       })
       .catch((error: unknown) => {
@@ -71,7 +74,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
       const savedSettings = await updateMasterSettings({
         company: draft.company,
         payroll: draft.payroll,
-        emailDelivery: draft.emailDelivery,
+        emailDelivery: disableEmailDelivery(draft.emailDelivery),
         actor: {
           userId: session.user.id,
           displayName: session.user.displayName,
@@ -79,9 +82,10 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
         },
       });
 
-      setSettings(savedSettings);
-      setDraft(savedSettings);
-      onSettingsSaved?.(savedSettings);
+      const disabledEmailSettings = disableEmailDeliveryForSettings(savedSettings);
+      setSettings(disabledEmailSettings);
+      setDraft(disabledEmailSettings);
+      onSettingsSaved?.(disabledEmailSettings);
       setSuccessMessage("Setting master tersimpan dan audit perubahan tercatat.");
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "Setting master gagal disimpan.");
@@ -255,18 +259,20 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
                 <legend className="visually-hidden">Pengiriman Email</legend>
                 <div className="text-sm font-semibold text-foreground">Pengiriman Email Resend</div>
+              <PanelNote tone="warning">{EMAIL_DELIVERY_DISABLED_MESSAGE}</PanelNote>
               <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Checkbox
-                  checked={draft.emailDelivery.enabled}
-                  disabled={disabled}
-                  onCheckedChange={(checked) => updateEmailDeliveryField("enabled", checked === true)}
+                  checked={false}
+                  disabled
+                  onCheckedChange={() => updateEmailDeliveryField("enabled", false)}
                 />
-                Aktifkan pengiriman slip lewat email
+                Pengiriman slip lewat email dinonaktifkan
               </label>
               <label>
                 API key Resend
                 <Input
                   autoComplete="off"
+                  disabled
                   maxLength={220}
                   onChange={(event) => updateEmailDeliveryField("resendApiKey", event.target.value)}
                   placeholder={draft.emailDelivery.resendApiKeySet ? "API key sudah tersimpan. Isi untuk mengganti." : "re_xxxxxxxxx"}
@@ -281,6 +287,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                 <label>
                   Nama pengirim
                   <Input
+                    disabled
                     maxLength={120}
                     onChange={(event) => updateEmailDeliveryField("fromName", event.target.value)}
                     value={draft.emailDelivery.fromName}
@@ -289,6 +296,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                 <label>
                   Email pengirim
                   <Input
+                    disabled
                     maxLength={160}
                     onChange={(event) => updateEmailDeliveryField("fromEmail", event.target.value)}
                     type="email"
@@ -299,6 +307,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               <label>
                 Reply-to email
                 <Input
+                  disabled
                   maxLength={160}
                   onChange={(event) => updateEmailDeliveryField("replyToEmail", event.target.value)}
                   placeholder="Opsional"
@@ -361,5 +370,20 @@ function settingsChanged(current: MasterSettings | null, draft: MasterSettings):
 
   return JSON.stringify(current.company) !== JSON.stringify(draft.company)
     || JSON.stringify(current.payroll) !== JSON.stringify(draft.payroll)
-    || JSON.stringify(current.emailDelivery) !== JSON.stringify(draft.emailDelivery);
+    || JSON.stringify(disableEmailDelivery(current.emailDelivery)) !== JSON.stringify(disableEmailDelivery(draft.emailDelivery));
+}
+
+function disableEmailDeliveryForSettings(settings: MasterSettings): MasterSettings {
+  return {
+    ...settings,
+    emailDelivery: disableEmailDelivery(settings.emailDelivery),
+  };
+}
+
+function disableEmailDelivery(settings: MasterSettings["emailDelivery"]): MasterSettings["emailDelivery"] {
+  return {
+    ...settings,
+    enabled: false,
+    resendApiKey: "",
+  };
 }

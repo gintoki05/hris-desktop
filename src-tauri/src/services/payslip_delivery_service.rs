@@ -12,6 +12,9 @@ use crate::{
     services::{database_service, settings_service},
 };
 
+const EMAIL_DELIVERY_DISABLED_MESSAGE: &str =
+    "pengiriman email Resend sedang dinonaktifkan sementara. Gunakan pengiriman WhatsApp manual.";
+
 #[derive(Deserialize)]
 pub struct DeliveryActor {
     pub user_id: String,
@@ -218,6 +221,11 @@ pub fn send_payslip_email(
 ) -> Result<PayslipDeliveryQueueItem, AppError> {
     database_service::initialize_local_database(app)?;
     validate_actor(&input.actor)?;
+    if is_resend_email_delivery_disabled() {
+        return Err(AppError::Database(
+            EMAIL_DELIVERY_DISABLED_MESSAGE.to_string(),
+        ));
+    }
 
     let connection = database_service::open_local_connection(app)?;
     let item = get_queue_item(&connection, &input.payslip_snapshot_id)?
@@ -534,4 +542,8 @@ fn escape_html(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#039;")
+}
+
+fn is_resend_email_delivery_disabled() -> bool {
+    true
 }

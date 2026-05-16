@@ -27,6 +27,7 @@ export type AdminPage =
   | "reports"
   | "payslips"
   | "portal-ess"
+  | "users"
   | "backup";
 
 type AdminLayoutProps = PropsWithChildren<{
@@ -47,6 +48,7 @@ const navItems: NavItem[] = [
   { id: "reports", label: "Laporan", permission: "reports:view" },
   { id: "payslips", label: "Slip PDF", permission: "payslips:view" },
   { id: "portal-ess", label: "Portal ESS", permission: "portal-ess:manage" },
+  { id: "users", label: "User", permission: "users:manage" },
   { id: "backup", label: "Backup", permission: "backup:manage" },
 ];
 

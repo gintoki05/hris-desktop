@@ -1,17 +1,40 @@
 import { ROLE_PERMISSIONS } from "../constants";
-import { localAuthRepository } from "../repositories/local-auth.repository";
-import type { AuthPermission, AuthRole, LoginInput } from "../types";
+import { tauriAuthRepository } from "../repositories/tauri-auth.repository";
+import type {
+  AuthPermission,
+  AuthRole,
+  CreateUserInput,
+  LoginInput,
+  ResetUserPasswordInput,
+  UpdateUserInput,
+} from "../types";
 
 export async function getCurrentAuthSession() {
-  return localAuthRepository.getSession();
+  return tauriAuthRepository.getSession();
+}
+
+export async function listManagedUsers() {
+  return tauriAuthRepository.listUsers();
 }
 
 export async function login(input: LoginInput) {
-  return localAuthRepository.login(input);
+  return tauriAuthRepository.login(input);
 }
 
 export async function logout() {
-  await localAuthRepository.logout();
+  await tauriAuthRepository.logout();
+}
+
+export async function createManagedUser(input: CreateUserInput) {
+  return tauriAuthRepository.createUser(input);
+}
+
+export async function updateManagedUser(input: UpdateUserInput) {
+  return tauriAuthRepository.updateUser(input);
+}
+
+export async function resetManagedUserPassword(input: ResetUserPasswordInput) {
+  return tauriAuthRepository.resetUserPassword(input);
 }
 
 export function roleCan(role: AuthRole, permission: AuthPermission): boolean {

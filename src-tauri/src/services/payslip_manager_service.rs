@@ -222,6 +222,8 @@ const DEDUCTION_COMPONENT_NAMES: [&str; 6] = [
     "Potongan Absen",
     "Potongan Terlambat",
 ];
+const EMAIL_DELIVERY_DISABLED_MESSAGE: &str =
+    "pengiriman email Resend sedang dinonaktifkan sementara. Gunakan pengiriman WhatsApp manual.";
 
 pub fn list_payslip_periods(app: &AppHandle) -> Result<Vec<PayslipPeriod>, AppError> {
     database_service::initialize_local_database(app)?;
@@ -547,6 +549,11 @@ pub fn send_payslip_email(
 ) -> Result<PayslipSnapshot, AppError> {
     database_service::initialize_local_database(app)?;
     validate_actor(&input.actor)?;
+    if is_resend_email_delivery_disabled() {
+        return Err(AppError::Database(
+            EMAIL_DELIVERY_DISABLED_MESSAGE.to_string(),
+        ));
+    }
 
     let connection = database_service::open_local_connection(app)?;
     let snapshot = get_payslip_snapshot(&connection, &input.snapshot_id)?
@@ -1373,6 +1380,10 @@ fn escape_html(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#039;")
+}
+
+fn is_resend_email_delivery_disabled() -> bool {
+    true
 }
 
 fn write_payslip_pdf(

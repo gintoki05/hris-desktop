@@ -715,6 +715,60 @@ const MIGRATIONS: &[Migration] = &[
             ON payslip_snapshots(portal_publish_status);
     ",
     },
+    Migration {
+        id: "202605160001_seed_local_auth_users",
+        sql: "
+        INSERT OR IGNORE INTO auth_users (
+            id,
+            username,
+            display_name,
+            role_id,
+            password_hash,
+            password_salt,
+            password_algorithm,
+            is_active,
+            created_at,
+            updated_at
+        )
+        VALUES
+            (
+                'local-admin-payroll',
+                'admin.payroll',
+                'Admin Payroll',
+                'admin_payroll',
+                '5dfadf22dec920f20f8feb7de1db3be499c81df59f3a03fd56164e2a9cf60164',
+                'hris-local-seed-admin.payroll',
+                'sha256_iter_100000',
+                1,
+                datetime('now'),
+                datetime('now')
+            ),
+            (
+                'local-owner',
+                'owner',
+                'Owner/Manajemen',
+                'owner_management',
+                '1b3cc7037734ab5decbb9e491a51c0d1ba96c9ca887702595cd41cfb54448a5b',
+                'hris-local-seed-owner',
+                'sha256_iter_100000',
+                1,
+                datetime('now'),
+                datetime('now')
+            ),
+            (
+                'local-viewer',
+                'viewer',
+                'Viewer',
+                'viewer',
+                'ad87729d1656c761ad0696c9797145bcf42145ec541a0fed0e2a0df14b238592',
+                'hris-local-seed-viewer',
+                'sha256_iter_100000',
+                1,
+                datetime('now'),
+                datetime('now')
+            );
+    ",
+    },
 ];
 
 pub fn initialize_local_database(app: &AppHandle) -> Result<DatabaseStatus, AppError> {

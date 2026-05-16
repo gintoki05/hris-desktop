@@ -59,11 +59,11 @@ function validateManualPayrollDraft(draft: ManualPayrollDraft): void {
   }
 
   if (!draft.period.startDate || !draft.period.endDate) {
-    throw new Error("Tanggal mulai dan selesai payroll wajib diisi.");
+    throw new Error("Periode mulai dan periode selesai payroll wajib diisi.");
   }
 
   if (draft.period.startDate > draft.period.endDate) {
-    throw new Error("Tanggal mulai payroll tidak boleh setelah tanggal selesai.");
+    throw new Error("Periode mulai payroll tidak boleh setelah periode selesai.");
   }
 
   const uniqueEmployeeIds = new Set<string>();

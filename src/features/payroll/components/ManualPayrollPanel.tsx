@@ -330,11 +330,11 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
             <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} />
           </label>
           <label>
-            Tanggal mulai
+            Periode mulai
             <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           </label>
           <label>
-            Tanggal selesai
+            Periode selesai
             <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
           <Button disabled={!canEditPayroll || isSaving || selectedCount === 0} onClick={() => void handleSaveDraft()} type="button" variant="outline">

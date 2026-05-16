@@ -8,7 +8,6 @@ import {
   publishFinalPayslipsToPortal as publishToPortalWithRepository,
   savePayslipImportBatch as saveImportBatchWithRepository,
   savePayslipPeriod as savePeriodWithRepository,
-  sendPayslipManagerEmail as sendEmailWithRepository,
   updatePayslipSnapshotSendStatus as updateSnapshotStatusWithRepository,
 } from "../repositories/tauri-payslip-manager.repository";
 import type {
@@ -21,6 +20,9 @@ import type {
   PayslipPeriodInput,
   PayslipSendStatus,
 } from "../types";
+
+const EMAIL_DELIVERY_DISABLED_MESSAGE =
+  "Pengiriman email Resend sedang dinonaktifkan sementara. Gunakan pengiriman WhatsApp manual.";
 
 export function listPayslipPeriods(): Promise<PayslipPeriod[]> {
   return listPeriodsWithRepository();
@@ -64,7 +66,9 @@ export function sendPayslipManagerEmail(
   snapshotId: string,
   session: AuthSession,
 ): Promise<PayslipManagerSnapshot> {
-  return sendEmailWithRepository(snapshotId, toActor(session));
+  void snapshotId;
+  void session;
+  return Promise.reject(new Error(EMAIL_DELIVERY_DISABLED_MESSAGE));
 }
 
 export function publishFinalPayslipsToPortal(

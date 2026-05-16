@@ -24,6 +24,7 @@ import { AttendanceImportPanel } from "./features/attendance/components/Attendan
 import { AttendanceMasterPanel } from "./features/attendance/components/AttendanceMasterPanel";
 import { WorkSchedulePanel } from "./features/attendance/components/WorkSchedulePanel";
 import { LoginPanel } from "./features/auth/components/LoginPanel";
+import { UserManagementPanel } from "./features/auth/components/UserManagementPanel";
 import { useAuthSession } from "./features/auth/hooks/useAuthSession";
 import type { AuthPermission } from "./features/auth/types";
 import { BackupRestorePanel } from "./features/backup/components/BackupRestorePanel";
@@ -149,6 +150,7 @@ function App() {
       payslips: "Slip PDF",
       "portal-ess": "Portal ESS",
       reports: "Laporan",
+      users: "Manajemen User",
     };
 
     return titles[activePage];
@@ -164,6 +166,7 @@ function App() {
       payslips: "Kelola periode slip, daftar slip karyawan, PDF massal, dan status kirim WhatsApp manual.",
       "portal-ess": "Kelola akun login karyawan dan sinkronisasi profile Employee Self-Service Portal.",
       reports: "Lihat ringkasan payroll dan data manajemen tanpa aksi perubahan.",
+      users: "Kelola akun login aplikasi desktop, role akses, dan status kredensial lokal.",
     };
 
     return descriptions[activePage];
@@ -323,6 +326,10 @@ function App() {
           onOpenEmployeeDetail={openEmployeeDetailFromPortal}
           session={auth.session}
         />
+      ) : null}
+
+      {activePage === "users" ? (
+        <UserManagementPanel canManage={auth.can("users:manage")} />
       ) : null}
 
       {activePage === "backup" ? (
