@@ -21,6 +21,3 @@ export const ROLE_PERMISSIONS: Record<AuthRole, AuthPermission[]> = {
   owner_management: ["dashboard:view", "reports:view", "payslips:view"],
   viewer: ["dashboard:view"],
 };
-
-export const LOGIN_HELP_TEXT =
-  "Gunakan akun lokal sesuai role. Data auth V1 tetap offline di perangkat ini.";

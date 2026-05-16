@@ -37,6 +37,7 @@ button:disabled {
 .login-screen {
   align-items: center;
   display: flex;
+  justify-content: center;
   min-height: 100vh;
   padding: 32px;
 }

@@ -5,14 +5,11 @@ import { Button } from "../../../components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { APP_BRAND_NAME, DEFAULT_APP_LOGO_SRC } from "../../../constants/branding";
-import { LOGIN_HELP_TEXT } from "../constants";
 import type { LoginInput } from "../types";
 
 type LoginPanelProps = {
@@ -22,7 +19,7 @@ type LoginPanelProps = {
 };
 
 export function LoginPanel({ errorMessage, isLoading, onLogin }: LoginPanelProps) {
-  const [username, setUsername] = useState("admin.payroll");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -49,66 +46,58 @@ export function LoginPanel({ errorMessage, isLoading, onLogin }: LoginPanelProps
             <p className="eyebrow">{APP_BRAND_NAME}</p>
           </div>
           <CardTitle>Login Lokal</CardTitle>
-          <CardDescription>{LOGIN_HELP_TEXT}</CardDescription>
         </CardHeader>
 
-        <CardContent>
-        <form className="grid gap-4" onSubmit={handleSubmit}>
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            Username
-            <Input
-              autoComplete="username"
-              disabled={isLoading || isSubmitting}
-              onChange={(event) => setUsername(event.target.value)}
-              required
-              value={username}
-            />
-          </label>
-
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            Password
-            <span className="relative">
+        <CardContent className="pb-6">
+          <form className="grid gap-4" onSubmit={handleSubmit}>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              Username
               <Input
-                className="pr-10"
-                autoComplete="current-password"
+                autoComplete="username"
                 disabled={isLoading || isSubmitting}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => setUsername(event.target.value)}
                 required
-                type={isPasswordVisible ? "text" : "password"}
-                value={password}
+                value={username}
               />
-              <Button
-                aria-label={isPasswordVisible ? "Sembunyikan password" : "Lihat password"}
-                className="absolute right-1 top-1/2 -translate-y-1/2"
-                disabled={isLoading || isSubmitting}
-                onClick={() => setIsPasswordVisible((current) => !current)}
-                size="icon"
-                type="button"
-                variant="ghost"
-              >
-                {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-              </Button>
-            </span>
-          </label>
+            </label>
 
-          {errorMessage ? (
-            <Alert variant="destructive">
-              <AlertDescription>{errorMessage}</AlertDescription>
-            </Alert>
-          ) : null}
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              Password
+              <span className="relative">
+                <Input
+                  className="pr-10"
+                  autoComplete="current-password"
+                  disabled={isLoading || isSubmitting}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  type={isPasswordVisible ? "text" : "password"}
+                  value={password}
+                />
+                <Button
+                  aria-label={isPasswordVisible ? "Sembunyikan password" : "Lihat password"}
+                  className="absolute right-1 top-1/2 -translate-y-1/2"
+                  disabled={isLoading || isSubmitting}
+                  onClick={() => setIsPasswordVisible((current) => !current)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                </Button>
+              </span>
+            </label>
 
-          <Button disabled={isLoading || isSubmitting} type="submit">
-            {isSubmitting ? "Memeriksa..." : "Login"}
-          </Button>
-        </form>
+            {errorMessage ? (
+              <Alert variant="destructive">
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <Button disabled={isLoading || isSubmitting} type="submit">
+              {isSubmitting ? "Memeriksa..." : "Login"}
+            </Button>
+          </form>
         </CardContent>
-
-        <CardFooter className="grid gap-1 text-sm text-muted-foreground" aria-label="Akun awal">
-          <strong className="text-foreground">Akun awal V1</strong>
-          <span>admin.payroll / admin</span>
-          <span>owner / owner</span>
-          <span>viewer / viewer</span>
-        </CardFooter>
       </Card>
     </main>
   );
