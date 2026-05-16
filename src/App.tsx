@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from "./components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { APP_BRAND_NAME } from "./constants/branding";
 import { AttendanceImportPanel } from "./features/attendance/components/AttendanceImportPanel";
 import { AttendanceMasterPanel } from "./features/attendance/components/AttendanceMasterPanel";
 import { WorkSchedulePanel } from "./features/attendance/components/WorkSchedulePanel";
@@ -200,7 +201,7 @@ function App() {
     >
       <section className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">HRIS Payroll Klinik</p>
+          <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{APP_BRAND_NAME}</p>
           <h1 className="mb-2 text-3xl font-semibold tracking-normal text-foreground">{pageTitle}</h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{pageDescription}</p>
         </div>

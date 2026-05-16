@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
+import { APP_BRAND_NAME, DEFAULT_APP_LOGO_SRC } from "../../../constants/branding";
 import { LOGIN_HELP_TEXT } from "../constants";
 import type { LoginInput } from "../types";
 
@@ -41,7 +42,12 @@ export function LoginPanel({ errorMessage, isLoading, onLogin }: LoginPanelProps
     <main className="login-screen">
       <Card className="w-full max-w-md" aria-label="Login lokal">
         <CardHeader>
-          <p className="eyebrow">HRIS Payroll Klinik</p>
+          <div className="login-brand">
+            <span className="login-brand-mark" aria-hidden="true">
+              <img alt="" src={DEFAULT_APP_LOGO_SRC} />
+            </span>
+            <p className="eyebrow">{APP_BRAND_NAME}</p>
+          </div>
           <CardTitle>Login Lokal</CardTitle>
           <CardDescription>{LOGIN_HELP_TEXT}</CardDescription>
         </CardHeader>

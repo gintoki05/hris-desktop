@@ -486,6 +486,7 @@ fn normalize_email_delivery_input(
     input: EmailDeliverySettingsInput,
     previous: &StoredEmailDeliverySettings,
 ) -> Result<StoredEmailDeliverySettings, AppError> {
+    let _requested_enabled = input.enabled;
     let api_key = if input.resend_api_key.trim().is_empty() {
         previous.resend_api_key.clone()
     } else {

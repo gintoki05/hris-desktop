@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DEFAULT_APP_LOGO_SRC } from "@/constants/branding";
 import { cn } from "@/lib/utils";
 import { AUTH_ROLE_LABELS } from "../../features/auth/constants";
 import type { AuthPermission, AuthSession } from "../../features/auth/types";
@@ -69,14 +70,14 @@ export function AdminLayout({
           {/* Brand */}
           <div className="flex min-w-56 flex-none items-center gap-3 border-r border-border pr-5 py-3.5">
             <span
-              className="flex size-8 flex-none items-center justify-center overflow-hidden rounded-md bg-primary text-xs font-bold text-primary-foreground"
+              className="flex size-8 flex-none items-center justify-center overflow-hidden rounded-md border border-border bg-white"
               aria-hidden="true"
             >
-              {companyLogoDataUrl ? (
-                <img className="size-full object-contain p-0.5" alt="" src={companyLogoDataUrl} />
-              ) : (
-                "KP"
-              )}
+              <img
+                className="size-full object-contain p-0.5"
+                alt=""
+                src={companyLogoDataUrl || DEFAULT_APP_LOGO_SRC}
+              />
             </span>
             <span className="min-w-0">
               <strong className="block text-sm font-bold leading-tight tracking-tight">HRIS Payroll</strong>
