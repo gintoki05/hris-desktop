@@ -28,7 +28,7 @@ For production releases, prefer generating a password-protected key and updating
 
 ## Release Checklist
 
-1. Update the app version in `package.json` and `src-tauri/tauri.conf.json`.
+1. Update the app version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.
 2. Build the Tauri app with updater signing enabled.
 3. Upload the generated updater artifact and its signature content to Cloudflare Pages.
 4. Publish `/updates/latest.json`.
