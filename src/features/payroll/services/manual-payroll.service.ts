@@ -2,6 +2,7 @@ import { amountToIndonesianRupiahWords, calculatePayrollSnapshot } from "./payro
 import {
   finalizeManualPayroll as finalizeManualPayrollWithRepository,
   getFinalizedManualPayroll,
+  getLatestFinalizedManualPayrollBefore,
   getManualPayrollDraft,
   saveManualPayrollDraft,
 } from "../repositories/tauri-payroll.repository";
@@ -52,6 +53,7 @@ export async function saveManualPayrollDraftInput(draft: ManualPayrollDraft) {
 }
 
 export { getFinalizedManualPayroll, getManualPayrollDraft };
+export { getLatestFinalizedManualPayrollBefore };
 
 function validateManualPayrollDraft(draft: ManualPayrollDraft): void {
   if (!draft.period.label.trim()) {

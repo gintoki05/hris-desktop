@@ -95,6 +95,11 @@ pub struct ManualPayrollDraftQuery {
     pub period_end: String,
 }
 
+#[derive(Deserialize)]
+pub struct LatestFinalizedManualPayrollQuery {
+    pub period_start: String,
+}
+
 #[derive(Serialize)]
 pub struct ManualPayrollDraft {
     pub payroll_run_id: String,
@@ -480,6 +485,40 @@ pub fn get_finalized_manual_payroll(
                 query.period_start.trim(),
                 query.period_end.trim(),
             ],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    match run_id {
+        Some(id) => get_finalized_manual_payroll_by_id(app, &id),
+        None => Ok(None),
+    }
+}
+
+pub fn get_latest_finalized_manual_payroll_before(
+    app: &AppHandle,
+    query: LatestFinalizedManualPayrollQuery,
+) -> Result<Option<ManualPayrollDraft>, AppError> {
+    database_service::initialize_local_database(app)?;
+
+    if query.period_start.trim().is_empty() {
+        return Err(AppError::Database(
+            "periode mulai payroll wajib diisi".to_string(),
+        ));
+    }
+
+    let connection = database_service::open_local_connection(app)?;
+    let run_id: Option<String> = connection
+        .query_row(
+            "
+            SELECT id
+            FROM payroll_runs
+            WHERE status = 'finalized'
+                AND period_end < ?1
+            ORDER BY period_end DESC, finalized_at DESC, updated_at DESC
+            LIMIT 1
+            ",
+            [query.period_start.trim()],
             |row| row.get(0),
         )
         .optional()?;

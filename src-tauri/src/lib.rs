@@ -8,6 +8,7 @@ pub fn run() {
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::database::initialize_local_database,
             commands::auth_users::login_auth_user,
@@ -35,6 +36,7 @@ pub fn run() {
             commands::payroll::save_manual_payroll_draft,
             commands::payroll::get_manual_payroll_draft,
             commands::payroll::get_finalized_manual_payroll,
+            commands::payroll::get_latest_finalized_manual_payroll_before,
             commands::payslip_manager::list_payslip_periods,
             commands::payslip_manager::save_payslip_period,
             commands::payslip_manager::save_payslip_import_batch,

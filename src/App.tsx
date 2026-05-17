@@ -9,11 +9,9 @@ import {
 } from "lucide-react";
 import "./App.css";
 import { AdminLayout, type AdminPage } from "./components/layout/AdminLayout";
-import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -34,11 +32,13 @@ import { OrganizationMasterPanel } from "./features/organization/components/Orga
 import { PayslipManagerPanel } from "./features/payslips/components/PayslipManagerPanel";
 import { ManualPayrollPanel } from "./features/payroll/components/ManualPayrollPanel";
 import { PortalEssPanel } from "./features/portal-ess/components/PortalEssPanel";
+import { ReportsPanel } from "./features/reports/components/ReportsPanel";
 import { FoundationStatusPanel } from "./features/settings/components/FoundationStatusPanel";
 import { MasterSettingsPanel } from "./features/settings/components/MasterSettingsPanel";
 import { getFoundationStatus } from "./features/settings/services/foundation.service";
 import { getMasterSettings } from "./features/settings/services/master-settings.service";
 import type { FoundationStatus, MasterSettings } from "./features/settings/types";
+import { AppUpdatePanel } from "./features/updater/components/AppUpdatePanel";
 
 type MasterDataTab = "settings" | "employees" | "organization-master" | "attendance-master";
 
@@ -260,6 +260,7 @@ function App() {
               onSettingsSaved={setMasterSettings}
               session={auth.session}
             />
+            <AppUpdatePanel canInstall={auth.can("master-data:manage")} />
           </TabsContent>
 
           <TabsContent value="employees">
@@ -308,10 +309,7 @@ function App() {
       ) : null}
 
       {activePage === "reports" ? (
-        <PlaceholderPanel
-          description="Halaman laporan akan dipakai untuk ringkasan payroll dan data manajemen tanpa aksi perubahan."
-          title="Laporan belum diimplementasikan"
-        />
+        <ReportsPanel />
       ) : null}
 
       {activePage === "payslips" ? (
@@ -340,31 +338,6 @@ function App() {
         />
       ) : null}
     </AdminLayout>
-  );
-}
-
-function PlaceholderPanel({
-  description,
-  title,
-}: {
-  description: string;
-  title: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
-        <CardAction>
-          <Badge variant="outline">V1 backlog</Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
-        Detail implementasi akan diselesaikan saat scope backlog ini dikerjakan.
-      </CardContent>
-    </Card>
   );
 }
 

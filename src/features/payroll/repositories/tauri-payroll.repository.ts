@@ -113,6 +113,19 @@ export async function getFinalizedManualPayroll(query: {
   return dto ? toManualPayrollDraft(dto) : null;
 }
 
+export async function getLatestFinalizedManualPayrollBefore(query: {
+  periodStart: string;
+}): Promise<ManualPayrollDraft | null> {
+  ensureTauriRuntime();
+  const dto = await invoke<ManualPayrollDraftDto | null>("get_latest_finalized_manual_payroll_before", {
+    query: {
+      period_start: query.periodStart,
+    },
+  });
+
+  return dto ? toManualPayrollDraft(dto) : null;
+}
+
 function toFinalizeInputDto(input: ManualPayrollFinalizeInput): ManualPayrollFinalizeInputDto {
   return {
     period: {

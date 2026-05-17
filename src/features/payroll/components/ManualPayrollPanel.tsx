@@ -30,6 +30,7 @@ import { calculatePayrollSnapshot } from "../services/payroll-calculation.servic
 import {
   finalizeManualPayrollDraft,
   getFinalizedManualPayroll,
+  getLatestFinalizedManualPayrollBefore,
   getManualPayrollDraft,
   saveManualPayrollDraftInput,
 } from "../services/manual-payroll.service";
@@ -64,6 +65,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [carryForwardMessage, setCarryForwardMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -124,29 +126,47 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
           return;
         }
 
-        if (!payroll) {
-          if (isMounted) {
-            setPayrollRunId(null);
-            setPayrollStatus("new");
-            setRows(initializeRows(employees, {}));
-            setSuccessMessage(null);
-          }
+        if (payroll) {
+          const isFinalized = payroll.status === "finalized";
+          setPayrollRunId(payroll.payrollRunId);
+          setPayrollStatus(isFinalized ? "finalized" : "draft");
+          setRows((current) => applyDraftRows(initializeRows(employees, current), payroll.items));
+          setCarryForwardMessage(null);
+          setSuccessMessage(
+            isFinalized
+              ? `Payroll final ${formatDisplayDateText(payroll.periodLabel)} dimuat dari snapshot slip.`
+              : `Draft payroll ${formatDisplayDateText(payroll.periodLabel)} dimuat.`,
+          );
           return;
         }
 
-        const isFinalized = payroll.status === "finalized";
-        setPayrollRunId(payroll.payrollRunId);
-        setPayrollStatus(isFinalized ? "finalized" : "draft");
-        setRows((current) => applyDraftRows(initializeRows(employees, current), payroll.items));
-        setSuccessMessage(
-          isFinalized
-            ? `Payroll final ${formatDisplayDateText(payroll.periodLabel)} dimuat dari snapshot slip.`
-            : `Draft payroll ${formatDisplayDateText(payroll.periodLabel)} dimuat.`,
-        );
+        const previousPayroll = await getLatestFinalizedManualPayrollBefore({
+          periodStart: startDate,
+        });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setPayrollRunId(null);
+        setPayrollStatus("new");
+        setSuccessMessage(null);
+
+        if (previousPayroll) {
+          setRows(applyCarryForwardRows(initializeRows(employees, {}), previousPayroll.items));
+          setCarryForwardMessage(
+            `Isian awal disalin dari payroll final ${formatDisplayDateText(previousPayroll.periodLabel)}. Periksa kembali sebelum simpan draft atau finalisasi.`,
+          );
+          return;
+        }
+
+        setRows(initializeRows(employees, {}));
+        setCarryForwardMessage(null);
       } catch (error: unknown) {
         if (isMounted) {
           setPayrollRunId(null);
           setPayrollStatus("new");
+          setCarryForwardMessage(null);
           setErrorMessage(error instanceof Error ? error.message : "Draft payroll gagal dibaca.");
         }
       }
@@ -221,6 +241,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setCarryForwardMessage(null);
 
     try {
       const selectedItems = employees
@@ -268,6 +289,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setCarryForwardMessage(null);
 
     try {
       const selectedItems = employees
@@ -321,6 +343,7 @@ export function ManualPayrollPanel({ canEdit, session }: ManualPayrollPanelProps
             Payroll periode ini sudah final. Data ditampilkan readonly dari snapshot slip.
           </PanelNote>
         ) : null}
+        {carryForwardMessage ? <PanelNote>{carryForwardMessage}</PanelNote> : null}
         {errorMessage ? <AppNotice variant="error">{errorMessage}</AppNotice> : null}
         {successMessage ? <AppNotice variant="success">{successMessage}</AppNotice> : null}
 
@@ -453,6 +476,38 @@ function applyDraftRows(
     }
 
     nextRows[item.employeeId] = {
+      selected: true,
+      income: {
+        ...nextRows[item.employeeId].income,
+        ...Object.fromEntries(item.incomeComponents.map((component) => [component.name, component.amount])),
+      },
+      deductions: {
+        ...nextRows[item.employeeId].deductions,
+        ...Object.fromEntries(item.deductionComponents.map((component) => [component.name, component.amount])),
+      },
+    };
+  }
+
+  return nextRows;
+}
+
+function applyCarryForwardRows(
+  currentRows: Record<string, PayrollRowDraft>,
+  items: Array<{
+    employeeId: string;
+    incomeComponents: PayrollComponentAmount[];
+    deductionComponents: PayrollComponentAmount[];
+  }>,
+): Record<string, PayrollRowDraft> {
+  const nextRows = { ...currentRows };
+
+  for (const item of items) {
+    if (!nextRows[item.employeeId]) {
+      continue;
+    }
+
+    nextRows[item.employeeId] = {
+      ...nextRows[item.employeeId],
       selected: true,
       income: {
         ...nextRows[item.employeeId].income,
