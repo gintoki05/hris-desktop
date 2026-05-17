@@ -87,6 +87,23 @@ Do not run:
 - test commands
 - commands that open desktop windows, installers, or GUI apps
 
+Exception for app update work:
+
+When the user explicitly asks to implement, package, publish, or test the in-app updater, agents may run the minimum required non-build commands for that updater workflow:
+
+- read-only inspection of generated bundle artifacts
+- copying generated updater artifacts into a local release folder
+- `npx wrangler pages deploy ...` to publish updater files to Cloudflare Pages
+
+Agents must not run desktop build or signing commands for updater packaging. The user runs these locally:
+
+- `npm run build`
+- `npm run tauri build`
+- Tauri signer commands
+- commands that create or sign installer/update artifacts
+
+Keep this exception scoped to update packaging and verification only. Do not use it as permission for unrelated app-wide builds, dev servers, desktop window launches, installers, GUI apps, or broad deployment work. Before deploying to Cloudflare Pages, verify the target project/branch/path and avoid replacing unrelated portal content with an update-only folder.
+
 Agents may run dependency installation commands when needed for the current task, but must keep dependencies minimal, well-maintained, compatible with the offline-first desktop direction, and avoid server/cloud/SaaS dependencies unless the user explicitly asks.
 
 Agents may set up frontend UI tooling when the user explicitly asks for it, including Tailwind CSS and shadcn/ui dependencies/configuration for this Vite React Tauri app. Keep setup scoped to UI tooling and required local config files. Do not use UI setup as a reason to introduce a server framework, cloud service, telemetry, or app-wide redesign.

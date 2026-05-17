@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .tauri/
+release-updates/
 
 # Editor directories and files
 .vscode/*

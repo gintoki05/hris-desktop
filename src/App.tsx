@@ -210,6 +210,7 @@ function App() {
       {activePage === "dashboard" ? (
         <>
           <FoundationStatusPanel errorMessage={errorMessage} status={status} />
+          <AppUpdatePanel canInstall={auth.can("master-data:manage")} />
 
           <Card>
             <CardHeader className="flex-row items-center justify-between">

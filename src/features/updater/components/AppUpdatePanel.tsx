@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, RefreshCw } from "lucide-react";
+import { CheckCircle2, Download, RefreshCw, ShieldAlert } from "lucide-react";
 import { AppNotice } from "../../../components/shared/AppNotice";
 import { FeaturePanel, PanelBody, PanelNote, StatusBadge } from "../../../components/shared/FeaturePanel";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
@@ -58,16 +58,32 @@ export function AppUpdatePanel({ canInstall }: AppUpdatePanelProps) {
       ? `${progress.percentage}%`
       : formatBytes(progress.downloadedBytes)
     : "";
+  const visualState = getVisualState(result, isChecking, isInstalling);
 
   return (
     <FeaturePanel
       aria-label="Update aplikasi"
-      badge={<StatusBadge>{isUpdateAvailable ? "Update tersedia" : "Manual"}</StatusBadge>}
+      badge={
+        <StatusBadge className={visualState.badgeClassName}>
+          <visualState.Icon aria-hidden="true" className="size-3.5" />
+          {visualState.badgeLabel}
+        </StatusBadge>
+      }
       title="Update Aplikasi"
     >
       <PanelBody>
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
           <div className="space-y-2">
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+              <span className={visualState.iconClassName} aria-hidden="true">
+                <visualState.Icon className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <strong className="block text-sm font-semibold text-foreground">{visualState.title}</strong>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{visualState.description}</p>
+              </div>
+            </div>
+
             <p className="text-sm leading-6 text-muted-foreground">
               Cek update saat komputer tersambung internet. Data payroll tetap tersimpan lokal dan tidak ikut dikirim.
             </p>
@@ -153,4 +169,70 @@ function toErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function getVisualState(
+  result: AppUpdateCheckResult | null,
+  isChecking: boolean,
+  isInstalling: boolean,
+): {
+  badgeClassName: string;
+  badgeLabel: string;
+  description: string;
+  iconClassName: string;
+  Icon: typeof RefreshCw;
+  title: string;
+} {
+  if (isInstalling) {
+    return {
+      badgeClassName: "border-blue-300 bg-blue-50 text-blue-800",
+      badgeLabel: "Meng-install",
+      description: "Update sedang diunduh atau dipasang. Jangan tutup aplikasi sampai proses selesai.",
+      iconClassName: "mt-0.5 rounded-md bg-blue-100 p-2 text-blue-700",
+      Icon: Download,
+      title: "Update sedang diproses",
+    };
+  }
+
+  if (isChecking) {
+    return {
+      badgeClassName: "border-slate-300 bg-slate-50 text-slate-700",
+      badgeLabel: "Mengecek",
+      description: "Aplikasi sedang mengecek versi terbaru dari server update.",
+      iconClassName: "mt-0.5 rounded-md bg-slate-100 p-2 text-slate-700",
+      Icon: RefreshCw,
+      title: "Mengecek update",
+    };
+  }
+
+  if (result?.status === "available") {
+    return {
+      badgeClassName: "border-amber-300 bg-amber-50 text-amber-900",
+      badgeLabel: "Update tersedia",
+      description: `Versi ${result.latestVersion} tersedia. Buat backup bila release notes menyebut migrasi data.`,
+      iconClassName: "mt-0.5 rounded-md bg-amber-100 p-2 text-amber-800",
+      Icon: ShieldAlert,
+      title: "Update aplikasi tersedia",
+    };
+  }
+
+  if (result?.status === "current") {
+    return {
+      badgeClassName: "border-emerald-300 bg-emerald-50 text-emerald-800",
+      badgeLabel: "Terbaru",
+      description: "Aplikasi sudah memakai versi terbaru yang tersedia di server update.",
+      iconClassName: "mt-0.5 rounded-md bg-emerald-100 p-2 text-emerald-700",
+      Icon: CheckCircle2,
+      title: "Aplikasi terbaru",
+    };
+  }
+
+  return {
+    badgeClassName: "border-slate-300 bg-slate-50 text-slate-700",
+    badgeLabel: "Belum dicek",
+    description: "Klik Cek Update untuk melihat apakah ada versi aplikasi yang lebih baru.",
+    iconClassName: "mt-0.5 rounded-md bg-slate-100 p-2 text-slate-700",
+    Icon: RefreshCw,
+    title: "Status update belum dicek",
+  };
 }
