@@ -66,6 +66,16 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
       return;
     }
 
+    if (
+      draft.portalPublish.enabled
+      && (!draft.portalPublish.supabaseUrl.trim()
+        || (!draft.portalPublish.supabaseSecretKey.trim() && !draft.portalPublish.supabaseSecretKeySet))
+    ) {
+      setErrorMessage("Supabase URL dan Secret Key wajib diisi sebelum Portal ESS diaktifkan.");
+      setSuccessMessage(null);
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -75,6 +85,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
         company: draft.company,
         payroll: draft.payroll,
         emailDelivery: disableEmailDelivery(draft.emailDelivery),
+        portalPublish: draft.portalPublish,
         actor: {
           userId: session.user.id,
           displayName: session.user.displayName,
@@ -147,6 +158,23 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
             ...current,
             emailDelivery: {
               ...current.emailDelivery,
+              [field]: value,
+            },
+          }
+        : current,
+    );
+  }
+
+  function updatePortalPublishField<K extends keyof MasterSettings["portalPublish"]>(
+    field: K,
+    value: MasterSettings["portalPublish"][K],
+  ) {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            portalPublish: {
+              ...current.portalPublish,
               [field]: value,
             },
           }
@@ -317,6 +345,49 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               </label>
               </fieldset>
 
+              <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
+                <legend className="visually-hidden">Portal ESS Supabase</legend>
+                <div className="text-sm font-semibold text-foreground">Portal ESS / Supabase</div>
+                <PanelNote>
+                  Konfigurasi ini dipakai hanya saat admin publish slip ke portal. Secret disimpan lokal dan tidak ditampilkan ulang.
+                </PanelNote>
+                <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Checkbox
+                    checked={draft.portalPublish.enabled}
+                    onCheckedChange={(checked) => updatePortalPublishField("enabled", checked === true)}
+                  />
+                  Aktifkan publish slip ke Portal ESS
+                </label>
+                <label>
+                  Supabase URL
+                  <Input
+                    autoComplete="off"
+                    maxLength={220}
+                    onChange={(event) => updatePortalPublishField("supabaseUrl", event.target.value)}
+                    placeholder="https://project-ref.supabase.co"
+                    value={draft.portalPublish.supabaseUrl}
+                  />
+                </label>
+                <label>
+                  Supabase Secret Key
+                  <Input
+                    autoComplete="off"
+                    maxLength={260}
+                    onChange={(event) => updatePortalPublishField("supabaseSecretKey", event.target.value)}
+                    placeholder={
+                      draft.portalPublish.supabaseSecretKeySet
+                        ? "Secret key sudah tersimpan. Isi untuk mengganti."
+                        : "sb_secret_xxxxxxxxx"
+                    }
+                    type="password"
+                    value={draft.portalPublish.supabaseSecretKey}
+                  />
+                </label>
+                <span className="field-help">
+                  Kosongkan Secret Key saat menyimpan jika tidak ingin mengganti secret yang sudah tersimpan.
+                </span>
+              </fieldset>
+
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -370,7 +441,8 @@ function settingsChanged(current: MasterSettings | null, draft: MasterSettings):
 
   return JSON.stringify(current.company) !== JSON.stringify(draft.company)
     || JSON.stringify(current.payroll) !== JSON.stringify(draft.payroll)
-    || JSON.stringify(disableEmailDelivery(current.emailDelivery)) !== JSON.stringify(disableEmailDelivery(draft.emailDelivery));
+    || JSON.stringify(disableEmailDelivery(current.emailDelivery)) !== JSON.stringify(disableEmailDelivery(draft.emailDelivery))
+    || JSON.stringify(current.portalPublish) !== JSON.stringify(draft.portalPublish);
 }
 
 function disableEmailDeliveryForSettings(settings: MasterSettings): MasterSettings {

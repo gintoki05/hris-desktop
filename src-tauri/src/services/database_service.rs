@@ -716,6 +716,26 @@ const MIGRATIONS: &[Migration] = &[
     ",
     },
     Migration {
+        id: "202605170001_portal_publish_settings",
+        sql: "
+        CREATE TABLE IF NOT EXISTS portal_publish_settings (
+            id TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+            supabase_url TEXT NOT NULL DEFAULT '',
+            supabase_secret_key TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO portal_publish_settings (
+            id, enabled, supabase_url, supabase_secret_key, created_at, updated_at
+        )
+        VALUES (
+            'default', 0, '', '', datetime('now'), datetime('now')
+        );
+    ",
+    },
+    Migration {
         id: "202605160001_seed_local_auth_users",
         sql: "
         INSERT OR IGNORE INTO auth_users (

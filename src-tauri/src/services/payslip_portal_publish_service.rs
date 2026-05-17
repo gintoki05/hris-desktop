@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, Manager};
 
-use crate::{error::AppError, services::database_service};
+use crate::{
+    error::AppError,
+    services::{database_service, settings_service},
+};
 
 const PAYSLIP_BUCKET: &str = "payslips";
 
@@ -1153,6 +1156,33 @@ fn mask_identifier(value: &str) -> String {
 }
 
 fn read_publish_config(app: &AppHandle) -> Result<PublishConfig, AppError> {
+    if let Ok(settings) = settings_service::get_portal_publish_settings(app) {
+        let supabase_url = settings.supabase_url.trim().trim_end_matches('/').to_string();
+        let api_key = settings.supabase_secret_key.trim().to_string();
+
+        if settings.enabled {
+            if supabase_url.is_empty() || api_key.is_empty() {
+                return Err(AppError::Supabase(portal_config_missing_message()));
+            }
+
+            return Ok(PublishConfig {
+                supabase_url,
+                api_key,
+                api_key_kind: SupabaseApiKeyKind::Secret,
+            });
+        }
+
+        if !supabase_url.is_empty() || !api_key.is_empty() {
+            return Err(AppError::Supabase(
+                "Portal ESS belum diaktifkan. Aktifkan publish portal di Pengaturan sebelum publish slip.".to_string(),
+            ));
+        }
+    }
+
+    read_publish_config_from_env(app).map_err(|_| AppError::Supabase(portal_config_missing_message()))
+}
+
+fn read_publish_config_from_env(app: &AppHandle) -> Result<PublishConfig, AppError> {
     let supabase_url = read_secret_config(app, "SUPABASE_URL")?
         .trim_end_matches('/')
         .to_string();
@@ -1175,6 +1205,10 @@ fn read_publish_config(app: &AppHandle) -> Result<PublishConfig, AppError> {
         api_key,
         api_key_kind,
     })
+}
+
+fn portal_config_missing_message() -> String {
+    "Konfigurasi Portal ESS belum lengkap. Isi Supabase URL dan Secret Key di Pengaturan.".to_string()
 }
 
 fn read_secret_config(app: &AppHandle, key: &str) -> Result<String, AppError> {

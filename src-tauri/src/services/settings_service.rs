@@ -51,6 +51,13 @@ pub struct EmailDeliverySettings {
     pub reply_to_email: String,
 }
 
+#[derive(Clone, PartialEq, Serialize)]
+pub struct PortalPublishSettings {
+    pub enabled: bool,
+    pub supabase_url: String,
+    pub supabase_secret_key_set: bool,
+}
+
 #[derive(Clone)]
 pub struct StoredEmailDeliverySettings {
     pub provider: String,
@@ -61,11 +68,19 @@ pub struct StoredEmailDeliverySettings {
     pub reply_to_email: String,
 }
 
+#[derive(Clone)]
+pub struct StoredPortalPublishSettings {
+    pub enabled: bool,
+    pub supabase_url: String,
+    pub supabase_secret_key: String,
+}
+
 #[derive(Serialize)]
 pub struct MasterSettings {
     pub company: CompanySettings,
     pub payroll: PayrollSettings,
     pub email_delivery: EmailDeliverySettings,
+    pub portal_publish: PortalPublishSettings,
     pub recent_audit_events: Vec<SettingsAuditEvent>,
 }
 
@@ -110,10 +125,18 @@ pub struct EmailDeliverySettingsInput {
 }
 
 #[derive(Deserialize)]
+pub struct PortalPublishSettingsInput {
+    pub enabled: bool,
+    pub supabase_url: String,
+    pub supabase_secret_key: String,
+}
+
+#[derive(Deserialize)]
 pub struct MasterSettingsInput {
     pub company: CompanySettingsInput,
     pub payroll: PayrollSettingsInput,
     pub email_delivery: EmailDeliverySettingsInput,
+    pub portal_publish: PortalPublishSettingsInput,
     pub actor: SettingsActor,
 }
 
@@ -125,6 +148,7 @@ pub fn get_master_settings(app: &AppHandle) -> Result<MasterSettings, AppError> 
         company: get_company_settings(&connection)?,
         payroll: get_payroll_settings(&connection)?,
         email_delivery: public_email_delivery_settings(&get_stored_email_delivery_settings(&connection)?),
+        portal_publish: public_portal_publish_settings(&get_stored_portal_publish_settings(&connection)?),
         recent_audit_events: list_recent_audit_events(&connection)?,
     })
 }
@@ -145,7 +169,10 @@ pub fn update_master_settings(
     let previous_company = get_company_settings(&transaction)?;
     let previous_payroll = get_payroll_settings(&transaction)?;
     let previous_email_delivery = get_stored_email_delivery_settings(&transaction)?;
+    let previous_portal_publish = get_stored_portal_publish_settings(&transaction)?;
     let email_delivery = normalize_email_delivery_input(input.email_delivery, &previous_email_delivery)?;
+    let portal_publish =
+        normalize_portal_publish_input(input.portal_publish, &previous_portal_publish)?;
     let changed_fields = changed_field_names(
         &previous_company,
         &company,
@@ -153,6 +180,8 @@ pub fn update_master_settings(
         &payroll,
         &public_email_delivery_settings(&previous_email_delivery),
         &public_email_delivery_settings(&email_delivery),
+        &previous_portal_publish,
+        &portal_publish,
     );
 
     transaction.execute(
@@ -233,6 +262,24 @@ pub fn update_master_settings(
         ),
     )?;
 
+    transaction.execute(
+        "
+        UPDATE portal_publish_settings
+        SET
+            enabled = ?1,
+            supabase_url = ?2,
+            supabase_secret_key = ?3,
+            updated_at = datetime('now')
+        WHERE id = ?4
+        ",
+        (
+            if portal_publish.enabled { 1 } else { 0 },
+            &portal_publish.supabase_url,
+            &portal_publish.supabase_secret_key,
+            DEFAULT_SETTINGS_ID,
+        ),
+    )?;
+
     let change_summary = if changed_fields.is_empty() {
         "Tidak ada perubahan nilai setting.".to_string()
     } else {
@@ -269,6 +316,12 @@ pub fn get_resend_delivery_settings(app: &AppHandle) -> Result<StoredEmailDelive
     database_service::initialize_local_database(app)?;
     let connection = database_service::open_local_connection(app)?;
     get_stored_email_delivery_settings(&connection)
+}
+
+pub fn get_portal_publish_settings(app: &AppHandle) -> Result<StoredPortalPublishSettings, AppError> {
+    database_service::initialize_local_database(app)?;
+    let connection = database_service::open_local_connection(app)?;
+    get_stored_portal_publish_settings(&connection)
 }
 
 fn get_company_settings(connection: &rusqlite::Connection) -> Result<CompanySettings, AppError> {
@@ -358,6 +411,30 @@ fn get_stored_email_delivery_settings(
         .ok_or_else(|| AppError::Database("setting email delivery default tidak ditemukan".to_string()))
 }
 
+fn get_stored_portal_publish_settings(
+    connection: &rusqlite::Connection,
+) -> Result<StoredPortalPublishSettings, AppError> {
+    connection
+        .query_row(
+            "
+            SELECT enabled, supabase_url, supabase_secret_key
+            FROM portal_publish_settings
+            WHERE id = ?1
+            ",
+            [DEFAULT_SETTINGS_ID],
+            |row| {
+                let enabled: i32 = row.get(0)?;
+                Ok(StoredPortalPublishSettings {
+                    enabled: enabled == 1,
+                    supabase_url: row.get(1)?,
+                    supabase_secret_key: row.get(2)?,
+                })
+            },
+        )
+        .optional()?
+        .ok_or_else(|| AppError::Database("setting Portal ESS default tidak ditemukan".to_string()))
+}
+
 fn public_email_delivery_settings(settings: &StoredEmailDeliverySettings) -> EmailDeliverySettings {
     EmailDeliverySettings {
         provider: settings.provider.clone(),
@@ -366,6 +443,14 @@ fn public_email_delivery_settings(settings: &StoredEmailDeliverySettings) -> Ema
         from_name: settings.from_name.clone(),
         from_email: settings.from_email.clone(),
         reply_to_email: settings.reply_to_email.clone(),
+    }
+}
+
+fn public_portal_publish_settings(settings: &StoredPortalPublishSettings) -> PortalPublishSettings {
+    PortalPublishSettings {
+        enabled: settings.enabled,
+        supabase_url: settings.supabase_url.clone(),
+        supabase_secret_key_set: !settings.supabase_secret_key.trim().is_empty(),
     }
 }
 
@@ -518,6 +603,37 @@ fn normalize_email_delivery_input(
     Ok(settings)
 }
 
+fn normalize_portal_publish_input(
+    input: PortalPublishSettingsInput,
+    previous: &StoredPortalPublishSettings,
+) -> Result<StoredPortalPublishSettings, AppError> {
+    let secret_key = if input.supabase_secret_key.trim().is_empty() {
+        previous.supabase_secret_key.clone()
+    } else {
+        input.supabase_secret_key.trim().to_string()
+    };
+    let settings = StoredPortalPublishSettings {
+        enabled: input.enabled,
+        supabase_url: input.supabase_url.trim().trim_end_matches('/').to_string(),
+        supabase_secret_key: secret_key,
+    };
+
+    if settings.enabled {
+        validate_required("Supabase URL Portal ESS", &settings.supabase_url)?;
+        validate_required("Supabase Secret Key Portal ESS", &settings.supabase_secret_key)?;
+    }
+
+    if !settings.supabase_url.is_empty()
+        && !(settings.supabase_url.starts_with("https://") || settings.supabase_url.starts_with("http://"))
+    {
+        return Err(AppError::Database(
+            "Supabase URL Portal ESS harus diawali http:// atau https://".to_string(),
+        ));
+    }
+
+    Ok(settings)
+}
+
 fn validate_payday(payroll: &PayrollSettings) -> Result<(), AppError> {
     match payroll.payday_type.as_str() {
         "day_of_month" => {
@@ -613,6 +729,8 @@ fn changed_field_names(
     payroll: &PayrollSettings,
     previous_email_delivery: &EmailDeliverySettings,
     email_delivery: &EmailDeliverySettings,
+    previous_portal_publish: &StoredPortalPublishSettings,
+    portal_publish: &StoredPortalPublishSettings,
 ) -> Vec<&'static str> {
     let mut fields = Vec::new();
 
@@ -679,6 +797,13 @@ fn changed_field_names(
         &mut fields,
         previous_email_delivery != email_delivery,
         "pengiriman email",
+    );
+    push_if_changed(
+        &mut fields,
+        previous_portal_publish.enabled != portal_publish.enabled
+            || previous_portal_publish.supabase_url != portal_publish.supabase_url
+            || previous_portal_publish.supabase_secret_key != portal_publish.supabase_secret_key,
+        "Portal ESS Supabase",
     );
 
     fields

@@ -58,6 +58,13 @@ export type EmailDeliverySettings = {
   replyToEmail: string;
 };
 
+export type PortalPublishSettings = {
+  enabled: boolean;
+  supabaseUrl: string;
+  supabaseSecretKey: string;
+  supabaseSecretKeySet: boolean;
+};
+
 export type SettingsAuditEvent = {
   id: string;
   actorDisplayName: string;
@@ -70,6 +77,7 @@ export type MasterSettings = {
   company: CompanySettings;
   payroll: PayrollSettings;
   emailDelivery: EmailDeliverySettings;
+  portalPublish: PortalPublishSettings;
   recentAuditEvents: SettingsAuditEvent[];
 };
 
@@ -77,6 +85,7 @@ export type MasterSettingsInput = {
   company: CompanySettings;
   payroll: PayrollSettings;
   emailDelivery: EmailDeliverySettings;
+  portalPublish: PortalPublishSettings;
   actor: {
     userId: string;
     displayName: string;

@@ -46,10 +46,18 @@ pub struct EmailDeliverySettingsDto {
 }
 
 #[derive(Serialize)]
+pub struct PortalPublishSettingsDto {
+    enabled: bool,
+    supabase_url: String,
+    supabase_secret_key_set: bool,
+}
+
+#[derive(Serialize)]
 pub struct MasterSettingsDto {
     company: CompanySettingsDto,
     payroll: PayrollSettingsDto,
     email_delivery: EmailDeliverySettingsDto,
+    portal_publish: PortalPublishSettingsDto,
     recent_audit_events: Vec<SettingsAuditEventDto>,
 }
 
@@ -94,10 +102,18 @@ pub struct EmailDeliverySettingsInputDto {
 }
 
 #[derive(Deserialize)]
+pub struct PortalPublishSettingsInputDto {
+    enabled: bool,
+    supabase_url: String,
+    supabase_secret_key: String,
+}
+
+#[derive(Deserialize)]
 pub struct MasterSettingsInputDto {
     company: CompanySettingsInputDto,
     payroll: PayrollSettingsInputDto,
     email_delivery: EmailDeliverySettingsInputDto,
+    portal_publish: PortalPublishSettingsInputDto,
     actor: SettingsActorDto,
 }
 
@@ -147,6 +163,11 @@ fn to_master_settings_dto(settings: settings_service::MasterSettings) -> MasterS
             from_email: settings.email_delivery.from_email,
             reply_to_email: settings.email_delivery.reply_to_email,
         },
+        portal_publish: PortalPublishSettingsDto {
+            enabled: settings.portal_publish.enabled,
+            supabase_url: settings.portal_publish.supabase_url,
+            supabase_secret_key_set: settings.portal_publish.supabase_secret_key_set,
+        },
         recent_audit_events: settings
             .recent_audit_events
             .into_iter()
@@ -191,6 +212,11 @@ fn to_master_settings_input(
             from_name: input.email_delivery.from_name,
             from_email: input.email_delivery.from_email,
             reply_to_email: input.email_delivery.reply_to_email,
+        },
+        portal_publish: settings_service::PortalPublishSettingsInput {
+            enabled: input.portal_publish.enabled,
+            supabase_url: input.portal_publish.supabase_url,
+            supabase_secret_key: input.portal_publish.supabase_secret_key,
         },
         actor: settings_service::SettingsActor {
             user_id: input.actor.user_id,

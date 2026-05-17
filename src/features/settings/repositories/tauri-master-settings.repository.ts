@@ -45,10 +45,17 @@ type EmailDeliverySettingsDto = {
   reply_to_email: string;
 };
 
+type PortalPublishSettingsDto = {
+  enabled: boolean;
+  supabase_url: string;
+  supabase_secret_key_set: boolean;
+};
+
 type MasterSettingsDto = {
   company: CompanySettingsDto;
   payroll: PayrollSettingsDto;
   email_delivery: EmailDeliverySettingsDto;
+  portal_publish: PortalPublishSettingsDto;
   recent_audit_events: SettingsAuditEventDto[];
 };
 
@@ -57,6 +64,9 @@ type MasterSettingsInputDto = {
   payroll: PayrollSettingsDto;
   email_delivery: Omit<EmailDeliverySettingsDto, "resend_api_key_set"> & {
     resend_api_key: string;
+  };
+  portal_publish: Omit<PortalPublishSettingsDto, "supabase_secret_key_set"> & {
+    supabase_secret_key: string;
   };
   actor: {
     user_id: string;
@@ -114,6 +124,12 @@ function toMasterSettings(dto: MasterSettingsDto): MasterSettings {
       fromEmail: dto.email_delivery.from_email,
       replyToEmail: dto.email_delivery.reply_to_email,
     },
+    portalPublish: {
+      enabled: dto.portal_publish.enabled,
+      supabaseUrl: dto.portal_publish.supabase_url,
+      supabaseSecretKey: "",
+      supabaseSecretKeySet: dto.portal_publish.supabase_secret_key_set,
+    },
     recentAuditEvents: dto.recent_audit_events.map((event) => ({
       id: event.id,
       actorDisplayName: event.actor_display_name,
@@ -152,6 +168,11 @@ function toMasterSettingsInputDto(input: MasterSettingsInput): MasterSettingsInp
       from_name: input.emailDelivery.fromName,
       from_email: input.emailDelivery.fromEmail,
       reply_to_email: input.emailDelivery.replyToEmail,
+    },
+    portal_publish: {
+      enabled: input.portalPublish.enabled,
+      supabase_url: input.portalPublish.supabaseUrl,
+      supabase_secret_key: input.portalPublish.supabaseSecretKey,
     },
     actor: {
       user_id: input.actor.userId,
@@ -200,6 +221,12 @@ function createBrowserPreviewSettings(): MasterSettings {
       fromName: "Payroll Klinik",
       fromEmail: "",
       replyToEmail: "",
+    },
+    portalPublish: {
+      enabled: false,
+      supabaseUrl: "",
+      supabaseSecretKey: "",
+      supabaseSecretKeySet: false,
     },
     recentAuditEvents: [],
   };
