@@ -1500,7 +1500,9 @@ fn authed_request(
     builder: reqwest::blocking::RequestBuilder,
     config: &PublishConfig,
 ) -> reqwest::blocking::RequestBuilder {
-    builder.header("apikey", &config.api_key)
+    builder
+        .header("apikey", &config.api_key)
+        .bearer_auth(&config.api_key)
 }
 
 fn rest_url(config: &PublishConfig, table: &str) -> String {
