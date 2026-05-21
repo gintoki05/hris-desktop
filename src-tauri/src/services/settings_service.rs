@@ -637,11 +637,11 @@ fn normalize_portal_publish_input(
     };
 
     if settings.enabled {
-        validate_required("Supabase URL Portal ESS", &settings.supabase_url)?;
-        validate_required("Supabase Secret Key Portal ESS", &settings.supabase_secret_key)?;
+        validate_required("Alamat portal", &settings.supabase_url)?;
+        validate_required("Kunci akses portal", &settings.supabase_secret_key)?;
         if !settings.payslips_enabled && !settings.owner_summary_enabled {
             return Err(AppError::Database(
-                "minimal satu jenis publish portal harus aktif".to_string(),
+                "minimal satu jenis data portal harus aktif".to_string(),
             ));
         }
     }
@@ -650,7 +650,7 @@ fn normalize_portal_publish_input(
         && !(settings.supabase_url.starts_with("https://") || settings.supabase_url.starts_with("http://"))
     {
         return Err(AppError::Database(
-            "Supabase URL Portal ESS harus diawali http:// atau https://".to_string(),
+            "Alamat portal harus diawali http:// atau https://".to_string(),
         ));
     }
 
@@ -828,7 +828,7 @@ fn changed_field_names(
             || previous_portal_publish.owner_summary_enabled != portal_publish.owner_summary_enabled
             || previous_portal_publish.supabase_url != portal_publish.supabase_url
             || previous_portal_publish.supabase_secret_key != portal_publish.supabase_secret_key,
-        "Portal ESS Supabase",
+        "Portal Employees",
     );
 
     fields

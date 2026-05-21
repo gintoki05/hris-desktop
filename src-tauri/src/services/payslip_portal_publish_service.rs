@@ -404,9 +404,9 @@ pub fn list_payslip_portal_status(
             } else if auth_user.is_none() {
                 error_message = "akun portal belum ditemukan".to_string();
             } else if profile.is_none() {
-                error_message = "employee profile belum dibuat di portal".to_string();
+                error_message = "profil karyawan portal belum dibuat".to_string();
             } else if remote_payslip.is_none() {
-                error_message = "slip periode ini belum publish di portal".to_string();
+                error_message = "slip periode ini belum terkirim ke portal".to_string();
             }
 
             PayslipPortalStatusItem {
@@ -534,7 +534,7 @@ pub fn list_employee_portal_status(
             } else if auth_user.is_none() {
                 "akun portal belum dibuat".to_string()
             } else if profile.is_none() {
-                "employee profile belum tersinkron".to_string()
+                "profil karyawan portal belum tersinkron".to_string()
             } else {
                 String::new()
             };
@@ -631,7 +631,7 @@ pub fn create_owner_portal_account(
     let auth_user_id = input.auth_user_id.trim().to_string();
     let temporary_password = input.temporary_password.trim().to_string();
     if auth_user_id.is_empty() {
-        return Err(AppError::Database("user owner wajib dipilih".to_string()));
+        return Err(AppError::Database("user manajemen wajib dipilih".to_string()));
     }
     if temporary_password.len() < 8 {
         return Err(AppError::Supabase(
@@ -644,7 +644,7 @@ pub fn create_owner_portal_account(
     let owner = get_local_owner_for_portal(&connection, &auth_user_id)?;
     if owner.portal_email.trim().is_empty() {
         return Err(AppError::Supabase(
-            "email portal owner wajib diisi di Manajemen User".to_string(),
+            "email portal manajemen wajib diisi di Manajemen User".to_string(),
         ));
     }
 
@@ -762,12 +762,12 @@ fn upsert_employee_profile<T: EmployeeProfilePublishSource>(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke Supabase".to_string()))?;
-    let rows: Vec<EmployeeProfileRow> = parse_json_response(response, "upsert employee profile")?;
+    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke portal".to_string()))?;
+    let rows: Vec<EmployeeProfileRow> = parse_json_response(response, "simpan profil karyawan portal")?;
     rows.into_iter()
         .next()
         .map(|row| row.id)
-        .ok_or_else(|| AppError::Supabase("employee profile tersimpan tetapi ID tidak dikembalikan".to_string()))
+        .ok_or_else(|| AppError::Supabase("profil karyawan portal tersimpan tetapi konfirmasi tidak diterima".to_string()))
 }
 
 fn get_employee_profile(
@@ -786,8 +786,8 @@ fn get_employee_profile(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke Supabase".to_string()))?;
-    let rows: Vec<EmployeeProfileRow> = parse_json_response(response, "lookup employee profile")?;
+    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke portal".to_string()))?;
+    let rows: Vec<EmployeeProfileRow> = parse_json_response(response, "cek profil karyawan portal")?;
     Ok(rows.into_iter().next())
 }
 
@@ -807,8 +807,8 @@ fn get_employee_profile_by_user_id(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke Supabase".to_string()))?;
-    let rows: Vec<EmployeeProfileRow> = parse_json_response(response, "lookup employee profile by user")?;
+    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke portal".to_string()))?;
+    let rows: Vec<EmployeeProfileRow> = parse_json_response(response, "cek profil karyawan portal")?;
     Ok(rows.into_iter().next())
 }
 
@@ -828,8 +828,8 @@ fn patch_employee_profile_by_employee_code<T: EmployeeProfilePublishSource>(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke Supabase".to_string()))?;
-    ensure_success_response(response, "update employee profile")
+    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke portal".to_string()))?;
+    ensure_success_response(response, "perbarui profil karyawan portal")
 }
 
 fn patch_employee_profile_by_id<T: EmployeeProfilePublishSource>(
@@ -848,8 +848,8 @@ fn patch_employee_profile_by_id<T: EmployeeProfilePublishSource>(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke Supabase".to_string()))?;
-    ensure_success_response(response, "update employee profile")
+    .map_err(|_| AppError::Supabase("tidak bisa terhubung ke portal".to_string()))?;
+    ensure_success_response(response, "perbarui profil karyawan portal")
 }
 
 fn employee_profile_body<T: EmployeeProfilePublishSource>(
@@ -886,7 +886,7 @@ fn upload_pdf(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("upload PDF gagal terhubung ke Supabase Storage".to_string()))?;
+    .map_err(|_| AppError::Supabase("upload PDF gagal terhubung ke portal".to_string()))?;
     ensure_success_response(response, "upload PDF")
 }
 
@@ -914,12 +914,12 @@ fn upsert_payslip_row(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("insert payslip gagal terhubung ke Supabase".to_string()))?;
-    let rows: Vec<PayslipRow> = parse_json_response(response, "insert payslip")?;
+    .map_err(|_| AppError::Supabase("simpan slip portal gagal terhubung ke portal".to_string()))?;
+    let rows: Vec<PayslipRow> = parse_json_response(response, "simpan slip portal")?;
     rows.into_iter()
         .next()
         .map(|row| row.id)
-        .ok_or_else(|| AppError::Supabase("payslip tersimpan tetapi ID tidak dikembalikan".to_string()))
+        .ok_or_else(|| AppError::Supabase("slip portal tersimpan tetapi konfirmasi tidak diterima".to_string()))
 }
 
 fn publish_owner_payroll_summary(
@@ -941,7 +941,7 @@ fn publish_owner_payroll_summary(
 
     for snapshot in snapshots {
         let parsed: SafePayslipSnapshot = serde_json::from_str(&snapshot.snapshot_json).map_err(|_| {
-            AppError::Database("snapshot payroll final tidak bisa dibaca untuk laporan owner".to_string())
+            AppError::Database("snapshot payroll final tidak bisa dibaca untuk laporan manajemen".to_string())
         })?;
         gross_pay += parsed.payroll.gross_pay;
         total_deductions += parsed.payroll.total_deductions;
@@ -994,12 +994,12 @@ fn publish_owner_payroll_summary(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("publish laporan owner gagal terhubung ke Supabase".to_string()))?;
-    let rows: Vec<OwnerPayrollSummaryRow> = parse_json_response(response, "publish laporan owner")?;
+    .map_err(|_| AppError::Supabase("kirim laporan manajemen gagal terhubung ke portal".to_string()))?;
+    let rows: Vec<OwnerPayrollSummaryRow> = parse_json_response(response, "kirim laporan manajemen")?;
     rows.into_iter()
         .next()
         .map(|row| row.id)
-        .ok_or_else(|| AppError::Supabase("laporan owner tersimpan tetapi ID tidak dikembalikan".to_string()))
+        .ok_or_else(|| AppError::Supabase("laporan manajemen tersimpan tetapi konfirmasi tidak diterima".to_string()))
 }
 
 fn to_component_summary_json(components: BTreeMap<String, i64>) -> Vec<serde_json::Value> {
@@ -1198,7 +1198,7 @@ fn ensure_period_is_finalized_payroll(
         Ok(())
     } else {
         Err(AppError::Database(
-            "hanya slip dari payroll yang sudah difinalisasi yang boleh dipublish ke portal".to_string(),
+            "hanya slip dari payroll yang sudah difinalisasi yang boleh dikirim ke portal".to_string(),
         ))
     }
 }
@@ -1248,7 +1248,7 @@ fn update_local_publish_failure(
 fn validate_snapshot_ready(snapshot: &FinalPayslipSnapshot) -> Result<(), AppError> {
     if !snapshot.portal_user_id.trim().is_empty() && !looks_like_uuid(&snapshot.portal_user_id) {
         return Err(AppError::Supabase(
-            "portal user ID karyawan tidak valid".to_string(),
+            "ID akun portal karyawan tidak valid".to_string(),
         ));
     }
 
@@ -1340,7 +1340,7 @@ fn create_auth_user_with_app_role(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("buat akun portal gagal terhubung ke Supabase Auth".to_string()))?;
+    .map_err(|_| AppError::Supabase("buat akun portal gagal terhubung ke portal".to_string()))?;
     let value: serde_json::Value = parse_json_response(response, "buat akun portal")?;
     value
         .get("id")
@@ -1352,7 +1352,7 @@ fn create_auth_user_with_app_role(
                 .and_then(|item| item.as_str())
         })
         .map(|id| id.to_string())
-        .ok_or_else(|| AppError::Supabase("akun portal dibuat tetapi user ID tidak dikembalikan".to_string()))
+        .ok_or_else(|| AppError::Supabase("akun portal dibuat tetapi konfirmasi tidak diterima".to_string()))
 }
 
 fn set_auth_user_app_role(
@@ -1373,8 +1373,8 @@ fn set_auth_user_app_role(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("set role akun portal gagal terhubung ke Supabase Auth".to_string()))?;
-    ensure_success_response(response, "set role akun portal")
+    .map_err(|_| AppError::Supabase("atur akses akun portal gagal terhubung ke portal".to_string()))?;
+    ensure_success_response(response, "atur akses akun portal")
 }
 
 fn list_auth_users(client: &Client, config: &PublishConfig) -> Result<Vec<AuthUserRow>, AppError> {
@@ -1387,8 +1387,8 @@ fn list_auth_users(client: &Client, config: &PublishConfig) -> Result<Vec<AuthUs
             config,
         )
         .send()
-        .map_err(|_| AppError::Supabase("lookup akun portal gagal terhubung ke Supabase Auth".to_string()))?;
-        let users_response: AuthUsersResponse = parse_json_response(response, "lookup akun portal")?;
+        .map_err(|_| AppError::Supabase("cek akun portal gagal terhubung ke portal".to_string()))?;
+        let users_response: AuthUsersResponse = parse_json_response(response, "cek akun portal")?;
 
         let is_last_page = users_response.users.len() < 100;
         users.extend(users_response.users);
@@ -1399,7 +1399,7 @@ fn list_auth_users(client: &Client, config: &PublishConfig) -> Result<Vec<AuthUs
     }
 
     Err(AppError::Supabase(
-        "lookup akun portal terlalu banyak halaman".to_string(),
+        "cek akun portal terlalu banyak halaman".to_string(),
     ))
 }
 
@@ -1414,8 +1414,8 @@ fn list_employee_profiles(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("lookup employee profiles gagal terhubung ke Supabase".to_string()))?;
-    parse_json_response(response, "lookup employee profiles")
+    .map_err(|_| AppError::Supabase("cek profil karyawan portal gagal terhubung ke portal".to_string()))?;
+    parse_json_response(response, "cek profil karyawan portal")
 }
 
 fn list_remote_payslips(
@@ -1429,8 +1429,8 @@ fn list_remote_payslips(
         config,
     )
     .send()
-    .map_err(|_| AppError::Supabase("lookup payslips portal gagal terhubung ke Supabase".to_string()))?;
-    parse_json_response(response, "lookup payslips portal")
+    .map_err(|_| AppError::Supabase("cek slip portal gagal terhubung ke portal".to_string()))?;
+    parse_json_response(response, "cek slip portal")
 }
 
 fn mask_email_for_ui(email: &str) -> String {
@@ -1470,7 +1470,7 @@ fn read_publish_config(app: &AppHandle) -> Result<PublishConfig, AppError> {
 
     if !settings.enabled {
         return Err(AppError::Supabase(
-            "Portal ESS belum diaktifkan. Aktifkan publish portal di Pengaturan sebelum publish.".to_string(),
+            "Portal Employees belum diaktifkan. Aktifkan pengiriman portal di Pengaturan.".to_string(),
         ));
     }
 
@@ -1480,7 +1480,7 @@ fn read_publish_config(app: &AppHandle) -> Result<PublishConfig, AppError> {
 
     if !settings.payslips_enabled && !settings.owner_summary_enabled {
         return Err(AppError::Supabase(
-            "minimal satu jenis publish portal harus aktif".to_string(),
+            "minimal satu jenis data portal harus aktif".to_string(),
         ));
     }
 
@@ -1493,7 +1493,7 @@ fn read_publish_config(app: &AppHandle) -> Result<PublishConfig, AppError> {
 }
 
 fn portal_config_missing_message() -> String {
-    "Konfigurasi Portal ESS belum lengkap. Isi Supabase URL dan Secret Key di Pengaturan.".to_string()
+    "Konfigurasi Portal Employees belum lengkap. Isi alamat portal dan kunci akses di Pengaturan.".to_string()
 }
 
 fn authed_request(
@@ -1517,11 +1517,11 @@ where
     let body = response.text().unwrap_or_default();
     if status.is_success() {
         serde_json::from_str(&body).map_err(|_| {
-            AppError::Supabase(format!("{action} berhasil tetapi response tidak bisa dibaca"))
+            AppError::Supabase(format!("{action} berhasil tetapi jawaban portal tidak bisa dibaca"))
         })
     } else {
         Err(AppError::Supabase(format!(
-            "{action} ditolak Supabase HTTP {}: {}",
+            "{action} ditolak portal (kode {}): {}",
             status.as_u16(),
             safe_supabase_error_message(&body)
         )))
@@ -1535,7 +1535,7 @@ fn ensure_success_response(response: Response, action: &str) -> Result<(), AppEr
     } else {
         let body = response.text().unwrap_or_default();
         Err(AppError::Supabase(format!(
-            "{action} ditolak Supabase HTTP {}: {}",
+            "{action} ditolak portal (kode {}): {}",
             status.as_u16(),
             safe_supabase_error_message(&body)
         )))
@@ -1557,7 +1557,7 @@ fn sanitize_error_message(value: &str) -> String {
     for marker in ["Bearer ", "eyJ", "sb_secret_", "service_role"] {
         if let Some(index) = message.find(marker) {
             message.truncate(index);
-            message.push_str("[secret disembunyikan]");
+            message.push_str("[kunci akses disembunyikan]");
         }
     }
     message.trim().to_string()
@@ -1611,7 +1611,7 @@ fn looks_like_uuid(value: &str) -> bool {
 fn validate_actor(actor: &PayslipPortalPublishActor) -> Result<(), AppError> {
     if actor.role != "admin_payroll" {
         return Err(AppError::Database(
-            "hanya Admin Payroll yang boleh publish slip ke portal".to_string(),
+            "hanya Admin Payroll yang boleh mengirim slip ke portal".to_string(),
         ));
     }
 

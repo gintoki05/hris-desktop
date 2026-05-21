@@ -60,8 +60,8 @@ const STATUS_LABELS: Record<AuthUserStatus, string> = {
   inactive: "Nonaktif",
 };
 const CREDENTIAL_SOURCE_LABELS: Record<UserManagementItem["credentialSource"], string> = {
-  local_seed: "Seed lokal",
-  sqlite: "SQLite lokal",
+  local_seed: "Default",
+  sqlite: "Lokal",
 };
 
 const EMPTY_FORM: UserFormState = {
@@ -161,8 +161,8 @@ export function UserManagementPanel({ canManage, session }: UserManagementPanelP
         });
         setSuccessMessage(
           result.accountStatus === "created"
-            ? `Akun portal owner ${result.displayName} berhasil dibuat.`
-            : `Akun portal owner ${result.displayName} sudah ada dan role owner tersinkron.`,
+            ? `Akun portal ${result.displayName} berhasil dibuat.`
+            : `Akun portal ${result.displayName} sudah ada dan akses manajemen tersinkron.`,
         );
       }
 
@@ -280,7 +280,7 @@ export function UserManagementPanel({ canManage, session }: UserManagementPanelP
                 <TableHead>Nama</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Portal Owner</TableHead>
+                <TableHead>Portal</TableHead>
                 <TableHead>Login Terakhir</TableHead>
                 <TableHead>Sumber</TableHead>
                 <TableHead>Aksi</TableHead>
@@ -373,7 +373,7 @@ export function UserManagementPanel({ canManage, session }: UserManagementPanelP
               <DialogTitle>{getDialogTitle(dialogMode)}</DialogTitle>
               <DialogDescription>
                 {dialogMode === "portal-owner"
-                  ? "Akun portal owner dibuat dari user lokal Owner/Manajemen dan login tetap dilakukan di Portal Employees."
+                  ? "Akun portal dibuat dari user lokal Owner/Manajemen dan login tetap dilakukan di Portal Employees."
                   : "Password disimpan sebagai hash di database lokal dan tidak ditampilkan ulang."}
               </DialogDescription>
             </DialogHeader>
@@ -440,7 +440,7 @@ export function UserManagementPanel({ canManage, session }: UserManagementPanelP
 
               {dialogMode !== "reset" && dialogMode !== "portal-owner" && form.role === "owner_management" ? (
                 <div className="grid gap-2">
-                  <Label htmlFor="user-portal-email">Email portal owner</Label>
+                  <Label htmlFor="user-portal-email">Email portal</Label>
                   <Input
                     autoComplete="email"
                     disabled={isSubmitting}
@@ -477,7 +477,7 @@ export function UserManagementPanel({ canManage, session }: UserManagementPanelP
                   <span className="font-medium text-foreground">{form.displayName}</span>
                   <span className="text-xs text-muted-foreground">{form.portalEmail || "Email portal belum diisi"}</span>
                   <span className="text-xs text-muted-foreground">
-                    Portal role akan diset ke Owner/Manajemen.
+                    Akses portal akan diset ke Owner/Manajemen.
                   </span>
                 </div>
               ) : null}
@@ -544,7 +544,7 @@ function getDialogTitle(mode: DialogMode | null): string {
   }
 
   if (mode === "portal-owner") {
-    return "Buat/Sinkron Akun Portal Owner";
+    return "Buat/Sinkron Akun Portal";
   }
 
   return "Manajemen User";

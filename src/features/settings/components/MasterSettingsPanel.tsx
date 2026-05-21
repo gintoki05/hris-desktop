@@ -19,7 +19,7 @@ type MasterSettingsPanelProps = {
 const LOGO_MAX_SIZE_BYTES = 512 * 1024;
 const LOGO_ACCEPTED_TYPES = ["image/png", "image/jpeg"] as const;
 const EMAIL_DELIVERY_DISABLED_MESSAGE =
-  "Pengiriman email Resend sedang dinonaktifkan sementara. Gunakan pengiriman WhatsApp manual.";
+  "Pengiriman email sedang dinonaktifkan sementara. Gunakan pengiriman WhatsApp manual.";
 
 export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: MasterSettingsPanelProps) {
   const [settings, setSettings] = useState<MasterSettings | null>(null);
@@ -71,7 +71,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
       && (!draft.portalPublish.supabaseUrl.trim()
         || (!draft.portalPublish.supabaseSecretKey.trim() && !draft.portalPublish.supabaseSecretKeySet))
     ) {
-      setErrorMessage("Supabase URL dan Secret Key wajib diisi sebelum Portal ESS diaktifkan.");
+      setErrorMessage("Alamat portal dan kunci akses wajib diisi sebelum Portal Employees diaktifkan.");
       setSuccessMessage(null);
       return;
     }
@@ -80,7 +80,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
       && !draft.portalPublish.payslipsEnabled
       && !draft.portalPublish.ownerSummaryEnabled
     ) {
-      setErrorMessage("Pilih minimal satu jenis data portal: slip karyawan atau laporan owner.");
+      setErrorMessage("Pilih minimal satu jenis data portal: slip karyawan atau laporan manajemen.");
       setSuccessMessage(null);
       return;
     }
@@ -295,7 +295,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
 
               <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
                 <legend className="visually-hidden">Pengiriman Email</legend>
-                <div className="text-sm font-semibold text-foreground">Pengiriman Email Resend</div>
+                <div className="text-sm font-semibold text-foreground">Pengiriman Email</div>
               <PanelNote tone="warning">{EMAIL_DELIVERY_DISABLED_MESSAGE}</PanelNote>
               <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Checkbox
@@ -306,19 +306,19 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                 Pengiriman slip lewat email dinonaktifkan
               </label>
               <label>
-                API key Resend
+                Kunci akses email
                 <Input
                   autoComplete="off"
                   disabled
                   maxLength={220}
                   onChange={(event) => updateEmailDeliveryField("resendApiKey", event.target.value)}
-                  placeholder={draft.emailDelivery.resendApiKeySet ? "API key sudah tersimpan. Isi untuk mengganti." : "re_xxxxxxxxx"}
+                  placeholder={draft.emailDelivery.resendApiKeySet ? "Kunci akses sudah tersimpan. Isi untuk mengganti." : "Masukkan kunci akses email"}
                   type="password"
                   value={draft.emailDelivery.resendApiKey}
                 />
               </label>
               <span className="field-help">
-                API key disimpan lokal dan tidak ditampilkan ulang setelah tersimpan.
+                Kunci akses disimpan lokal dan tidak ditampilkan ulang setelah tersimpan.
               </span>
               <div className="settings-two-columns">
                 <label>
@@ -355,17 +355,17 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
               </fieldset>
 
               <fieldset className="grid gap-4 rounded-lg border border-border p-4" disabled={disabled}>
-                <legend className="visually-hidden">Portal ESS Supabase</legend>
-                <div className="text-sm font-semibold text-foreground">Portal ESS / Supabase</div>
+                <legend className="visually-hidden">Portal Employees</legend>
+                <div className="text-sm font-semibold text-foreground">Portal Employees</div>
                 <PanelNote>
-                  Konfigurasi ini dipakai hanya saat admin publish slip ke portal. Secret disimpan lokal dan tidak ditampilkan ulang.
+                  Konfigurasi ini dipakai hanya saat admin mengirim slip dan laporan ringkas ke portal.
                 </PanelNote>
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Checkbox
                     checked={draft.portalPublish.enabled}
                     onCheckedChange={(checked) => updatePortalPublishField("enabled", checked === true)}
                   />
-                  Aktifkan publish ke Portal ESS
+                  Aktifkan pengiriman ke portal
                 </label>
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Checkbox
@@ -373,7 +373,7 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                     disabled={!draft.portalPublish.enabled}
                     onCheckedChange={(checked) => updatePortalPublishField("payslipsEnabled", checked === true)}
                   />
-                  Publish slip karyawan final
+                  Kirim slip karyawan final
                 </label>
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Checkbox
@@ -381,35 +381,35 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                     disabled={!draft.portalPublish.enabled}
                     onCheckedChange={(checked) => updatePortalPublishField("ownerSummaryEnabled", checked === true)}
                   />
-                  Publish laporan owner ringkas
+                  Kirim laporan manajemen ringkas
                 </label>
                 <label>
-                  Supabase URL
+                  Alamat portal
                   <Input
                     autoComplete="off"
                     maxLength={220}
                     onChange={(event) => updatePortalPublishField("supabaseUrl", event.target.value)}
-                    placeholder="https://project-ref.supabase.co"
+                    placeholder="https://alamat-koneksi-portal"
                     value={draft.portalPublish.supabaseUrl}
                   />
                 </label>
                 <label>
-                  Supabase Secret Key
+                  Kunci akses portal
                   <Input
                     autoComplete="off"
                     maxLength={260}
                     onChange={(event) => updatePortalPublishField("supabaseSecretKey", event.target.value)}
                     placeholder={
                       draft.portalPublish.supabaseSecretKeySet
-                        ? "Secret key sudah tersimpan. Isi untuk mengganti."
-                        : "sb_secret_xxxxxxxxx"
+                        ? "Kunci akses sudah tersimpan. Isi untuk mengganti."
+                        : "Masukkan kunci akses portal"
                     }
                     type="password"
                     value={draft.portalPublish.supabaseSecretKey}
                   />
                 </label>
                 <span className="field-help">
-                  Kosongkan Secret Key saat menyimpan jika tidak ingin mengganti secret yang sudah tersimpan.
+                  Kosongkan kunci akses saat menyimpan jika tidak ingin mengganti kunci yang sudah tersimpan.
                 </span>
               </fieldset>
 

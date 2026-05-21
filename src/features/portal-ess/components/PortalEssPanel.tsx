@@ -157,9 +157,9 @@ export function PortalEssPanel({ canManage, onOpenEmployeeDetail, session }: Por
                   <TableHead>Karyawan</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Akun</TableHead>
-                  <TableHead>Profile</TableHead>
-                  <TableHead>Slip Published</TableHead>
-                  <TableHead>Issue</TableHead>
+                  <TableHead>Profil</TableHead>
+                  <TableHead>Slip Terkirim</TableHead>
+                  <TableHead>Catatan</TableHead>
                   <TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -261,7 +261,7 @@ export function PortalEssPanel({ canManage, onOpenEmployeeDetail, session }: Por
                 />
               </label>
               <p className="text-xs leading-5 text-muted-foreground">
-                Password ini hanya dikirim ke Supabase Auth saat akun dibuat. Aplikasi tidak menyimpannya.
+                Password ini hanya dikirim saat akun portal dibuat. Aplikasi tidak menyimpannya.
                 Jika akun sudah ada, password tidak diubah dan hanya profile ESS yang disinkron.
               </p>
               <div className="flex justify-end gap-2">

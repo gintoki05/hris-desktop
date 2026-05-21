@@ -63,7 +63,7 @@ const WHATSAPP_STATUS_LABELS: Record<PayslipManagerSnapshot["whatsappStatus"], s
 const PORTAL_STATUS_LABELS: Record<PayslipManagerSnapshot["portalPublishStatus"], string> = {
   failed: "Gagal",
   not_published: "Belum",
-  published: "Published",
+  published: "Terkirim",
 };
 
 const PERIOD_PAGE_SIZE = 5;
@@ -112,6 +112,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
 
   const summary = useMemo(
     () => ({
+      employeeCount: snapshots.length,
       pdfReady: snapshots.filter((snapshot) => snapshot.pdfFilePath.trim()).length,
       whatsappSent: snapshots.filter((snapshot) => snapshot.whatsappStatus === "sent_manual").length,
       undelivered: snapshots.filter((snapshot) => snapshot.whatsappStatus !== "sent_manual").length,
@@ -197,23 +198,23 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       const result = await publishFinalPayslipsToPortal(selectedPeriod.id, session);
       await refreshSnapshots(selectedPeriod.id);
       const ownerSummaryMessage = result.ownerSummaryStatus === "published"
-        ? " Laporan owner ringkas ikut dipublish."
+        ? " Laporan manajemen ikut dikirim."
         : result.ownerSummaryStatus === "failed"
-          ? " Laporan owner ringkas gagal dipublish."
+          ? " Laporan manajemen gagal dikirim."
           : "";
       setSuccessMessage(
-        `Publish portal selesai: ${result.publishedCount} slip baru berhasil, ${result.skippedCount} sudah published, ${result.failedCount} gagal.${ownerSummaryMessage}`,
+        `Kirim ke portal selesai: ${result.publishedCount} slip baru berhasil, ${result.skippedCount} sudah terkirim, ${result.failedCount} gagal.${ownerSummaryMessage}`,
       );
       if (result.failedCount > 0 || result.ownerSummaryStatus === "failed") {
-        const firstFailure = result.items.find((item) => item.status === "failed");
-        setErrorMessage(firstFailure
-          ? `Sebagian publish gagal. Contoh: ${firstFailure.employeeName} - ${firstFailure.errorMessage}`
+        const hasFailedSlip = result.items.some((item) => item.status === "failed");
+        setErrorMessage(hasFailedSlip
+          ? "Sebagian slip gagal dikirim ke portal. Cek status Portal di tabel."
           : result.ownerSummaryErrorMessage
-            ? `Laporan owner gagal dipublish: ${result.ownerSummaryErrorMessage}`
-          : "Sebagian publish gagal. Buka status Portal di tabel untuk detail.");
+            ? `Laporan manajemen gagal dikirim: ${result.ownerSummaryErrorMessage}`
+          : "Sebagian data gagal dikirim ke portal.");
       }
     } catch (error: unknown) {
-      setErrorMessage(getErrorMessage(error, "Publish slip ke portal gagal."));
+      setErrorMessage(getErrorMessage(error, "Kirim slip ke portal gagal."));
     } finally {
       setIsPublishingPortal(false);
     }
@@ -422,7 +423,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             <span>PDF siap: <strong>{summary.pdfReady}</strong></span>
             <span>WA terkirim: <strong>{summary.whatsappSent}</strong></span>
             <span>Belum terkirim WA: <strong>{summary.undelivered}</strong></span>
-            <span>Portal: <strong>{summary.portalPublished}</strong></span>
+            <span>Portal terkirim: <strong>{summary.portalPublished}</strong></span>
             <span>Portal gagal: <strong>{summary.portalFailed}</strong></span>
             <Button
               disabled={!canRegeneratePdf}
@@ -440,7 +441,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
               type="button"
               variant="secondary"
             >
-              {isPublishingPortal ? "Publishing..." : "Publish ke Portal"}
+              {isPublishingPortal ? "Mengirim..." : "Kirim ke Portal"}
             </Button>
           </div>
 

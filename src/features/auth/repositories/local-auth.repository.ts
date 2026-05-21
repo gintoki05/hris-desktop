@@ -37,7 +37,7 @@ export const localAuthRepository: AuthRepository = {
   },
 
   async createOwnerPortalAccount() {
-    throw new Error("Akun portal owner hanya bisa dibuat saat aplikasi berjalan sebagai desktop app.");
+    throw new Error("Akun portal manajemen hanya bisa dibuat saat aplikasi berjalan sebagai desktop app.");
   },
 
   async getSession() {
