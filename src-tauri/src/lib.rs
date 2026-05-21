@@ -50,6 +50,7 @@ pub fn run() {
             commands::payslip_portal_publish::link_employee_portal_user,
             commands::payslip_portal_publish::list_employee_portal_status,
             commands::payslip_portal_publish::create_employee_portal_account,
+            commands::payslip_portal_publish::create_owner_portal_account,
             commands::payslip_delivery::list_payslip_delivery_queue,
             commands::payslip_delivery::update_payslip_delivery_status,
             commands::payslip_delivery::send_payslip_email

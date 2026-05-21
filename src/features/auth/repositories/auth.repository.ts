@@ -1,8 +1,10 @@
 import type {
   AuthSession,
+  CreateOwnerPortalAccountInput,
   CreateUserInput,
   LoginInput,
   LoginResult,
+  OwnerPortalAccountResult,
   ResetUserPasswordInput,
   UpdateUserInput,
   UserManagementItem,
@@ -10,6 +12,7 @@ import type {
 
 export type AuthRepository = {
   createUser: (input: CreateUserInput) => Promise<UserManagementItem>;
+  createOwnerPortalAccount: (input: CreateOwnerPortalAccountInput) => Promise<OwnerPortalAccountResult>;
   getSession: () => Promise<AuthSession | null>;
   listUsers: () => Promise<UserManagementItem[]>;
   login: (input: LoginInput) => Promise<LoginResult>;

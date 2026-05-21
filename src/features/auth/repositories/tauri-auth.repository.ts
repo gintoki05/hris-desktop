@@ -22,6 +22,8 @@ type AuthUserDto = {
   status: AuthUserStatus;
   credential_source: "sqlite";
   last_login_at: string | null;
+  portal_email: string;
+  portal_user_id: string;
 };
 
 type AuthSessionDto = {
@@ -40,6 +42,7 @@ type CreateUserInputDto = {
   display_name: string;
   role: AuthRole;
   password: string;
+  portal_email: string;
 };
 
 type UpdateUserInputDto = {
@@ -47,11 +50,20 @@ type UpdateUserInputDto = {
   display_name: string;
   role: AuthRole;
   status: AuthUserStatus;
+  portal_email: string;
 };
 
 type ResetPasswordInputDto = {
   id: string;
   password: string;
+};
+
+type OwnerPortalAccountResultDto = {
+  auth_user_id: string;
+  display_name: string;
+  portal_email: string;
+  portal_user_id: string;
+  account_status: "created" | "existing";
 };
 
 export const tauriAuthRepository: AuthRepository = {
@@ -61,6 +73,29 @@ export const tauriAuthRepository: AuthRepository = {
       input: toCreateUserInputDto(input),
     });
     return toUserManagementItem(dto);
+  },
+
+  async createOwnerPortalAccount(input) {
+    ensureTauriRuntime();
+    const dto = await invoke<OwnerPortalAccountResultDto>("create_owner_portal_account", {
+      input: {
+        auth_user_id: input.authUserId,
+        temporary_password: input.temporaryPassword,
+        actor: {
+          user_id: input.actor.userId,
+          display_name: input.actor.displayName,
+          role: input.actor.role,
+        },
+      },
+    });
+
+    return {
+      authUserId: dto.auth_user_id,
+      displayName: dto.display_name,
+      portalEmail: dto.portal_email,
+      portalUserId: dto.portal_user_id,
+      accountStatus: dto.account_status,
+    };
   },
 
   async getSession() {
@@ -192,6 +227,8 @@ function toUserManagementItem(dto: AuthUserDto): UserManagementItem {
     role: dto.role,
     credentialSource: dto.credential_source,
     lastLoginAt: dto.last_login_at,
+    portalEmail: dto.portal_email,
+    portalUserId: dto.portal_user_id,
     status: dto.status,
   };
 }
@@ -202,6 +239,7 @@ function toCreateUserInputDto(input: CreateUserInput): CreateUserInputDto {
     display_name: input.displayName,
     role: input.role,
     password: input.password,
+    portal_email: input.portalEmail,
   };
 }
 
@@ -211,6 +249,7 @@ function toUpdateUserInputDto(input: UpdateUserInput): UpdateUserInputDto {
     display_name: input.displayName,
     role: input.role,
     status: input.status,
+    portal_email: input.portalEmail,
   };
 }
 

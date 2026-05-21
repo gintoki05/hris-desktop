@@ -329,7 +329,7 @@ function App() {
       ) : null}
 
       {activePage === "users" ? (
-        <UserManagementPanel canManage={auth.can("users:manage")} />
+        <UserManagementPanel canManage={auth.can("users:manage")} session={auth.session} />
       ) : null}
 
       {activePage === "backup" ? (

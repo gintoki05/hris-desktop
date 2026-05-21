@@ -47,6 +47,8 @@ type EmailDeliverySettingsDto = {
 
 type PortalPublishSettingsDto = {
   enabled: boolean;
+  payslips_enabled: boolean;
+  owner_summary_enabled: boolean;
   supabase_url: string;
   supabase_secret_key_set: boolean;
 };
@@ -126,6 +128,8 @@ function toMasterSettings(dto: MasterSettingsDto): MasterSettings {
     },
     portalPublish: {
       enabled: dto.portal_publish.enabled,
+      payslipsEnabled: dto.portal_publish.payslips_enabled,
+      ownerSummaryEnabled: dto.portal_publish.owner_summary_enabled,
       supabaseUrl: dto.portal_publish.supabase_url,
       supabaseSecretKey: "",
       supabaseSecretKeySet: dto.portal_publish.supabase_secret_key_set,
@@ -171,6 +175,8 @@ function toMasterSettingsInputDto(input: MasterSettingsInput): MasterSettingsInp
     },
     portal_publish: {
       enabled: input.portalPublish.enabled,
+      payslips_enabled: input.portalPublish.payslipsEnabled,
+      owner_summary_enabled: input.portalPublish.ownerSummaryEnabled,
       supabase_url: input.portalPublish.supabaseUrl,
       supabase_secret_key: input.portalPublish.supabaseSecretKey,
     },
@@ -224,6 +230,8 @@ function createBrowserPreviewSettings(): MasterSettings {
     },
     portalPublish: {
       enabled: false,
+      payslipsEnabled: true,
+      ownerSummaryEnabled: false,
       supabaseUrl: "",
       supabaseSecretKey: "",
       supabaseSecretKeySet: false,

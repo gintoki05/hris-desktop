@@ -196,13 +196,20 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     try {
       const result = await publishFinalPayslipsToPortal(selectedPeriod.id, session);
       await refreshSnapshots(selectedPeriod.id);
+      const ownerSummaryMessage = result.ownerSummaryStatus === "published"
+        ? " Laporan owner ringkas ikut dipublish."
+        : result.ownerSummaryStatus === "failed"
+          ? " Laporan owner ringkas gagal dipublish."
+          : "";
       setSuccessMessage(
-        `Publish portal selesai: ${result.publishedCount} berhasil, ${result.failedCount} gagal.`,
+        `Publish portal selesai: ${result.publishedCount} slip baru berhasil, ${result.skippedCount} sudah published, ${result.failedCount} gagal.${ownerSummaryMessage}`,
       );
-      if (result.failedCount > 0) {
+      if (result.failedCount > 0 || result.ownerSummaryStatus === "failed") {
         const firstFailure = result.items.find((item) => item.status === "failed");
         setErrorMessage(firstFailure
           ? `Sebagian publish gagal. Contoh: ${firstFailure.employeeName} - ${firstFailure.errorMessage}`
+          : result.ownerSummaryErrorMessage
+            ? `Laporan owner gagal dipublish: ${result.ownerSummaryErrorMessage}`
           : "Sebagian publish gagal. Buka status Portal di tabel untuk detail.");
       }
     } catch (error: unknown) {

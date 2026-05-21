@@ -80,6 +80,10 @@ type PayslipPortalPublishResultDto = {
   attempted_count: number;
   published_count: number;
   failed_count: number;
+  skipped_count: number;
+  owner_summary_status: PayslipPortalPublishResult["ownerSummaryStatus"];
+  owner_summary_id: string;
+  owner_summary_error_message: string;
   items: PayslipPortalPublishItemResultDto[];
 };
 
@@ -241,6 +245,10 @@ export async function publishFinalPayslipsToPortal(
     attemptedCount: dto.attempted_count,
     publishedCount: dto.published_count,
     failedCount: dto.failed_count,
+    skippedCount: dto.skipped_count,
+    ownerSummaryStatus: dto.owner_summary_status,
+    ownerSummaryId: dto.owner_summary_id,
+    ownerSummaryErrorMessage: dto.owner_summary_error_message,
     items: dto.items.map((item) => ({
       snapshotId: item.snapshot_id,
       employeeName: item.employee_name,

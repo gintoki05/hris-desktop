@@ -736,6 +736,25 @@ const MIGRATIONS: &[Migration] = &[
     ",
     },
     Migration {
+        id: "202605210001_portal_publish_scope_settings",
+        sql: "
+        ALTER TABLE portal_publish_settings ADD COLUMN payslips_enabled INTEGER NOT NULL DEFAULT 1
+            CHECK (payslips_enabled IN (0, 1));
+        ALTER TABLE portal_publish_settings ADD COLUMN owner_summary_enabled INTEGER NOT NULL DEFAULT 0
+            CHECK (owner_summary_enabled IN (0, 1));
+    ",
+    },
+    Migration {
+        id: "202605210002_auth_user_portal_owner_link",
+        sql: "
+        ALTER TABLE auth_users ADD COLUMN portal_email TEXT NOT NULL DEFAULT '';
+        ALTER TABLE auth_users ADD COLUMN portal_user_id TEXT NOT NULL DEFAULT '';
+
+        CREATE INDEX IF NOT EXISTS idx_auth_users_portal_user_id
+            ON auth_users(portal_user_id);
+    ",
+    },
+    Migration {
         id: "202605160001_seed_local_auth_users",
         sql: "
         INSERT OR IGNORE INTO auth_users (

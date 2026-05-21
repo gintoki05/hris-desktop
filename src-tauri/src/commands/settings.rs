@@ -48,6 +48,8 @@ pub struct EmailDeliverySettingsDto {
 #[derive(Serialize)]
 pub struct PortalPublishSettingsDto {
     enabled: bool,
+    payslips_enabled: bool,
+    owner_summary_enabled: bool,
     supabase_url: String,
     supabase_secret_key_set: bool,
 }
@@ -104,6 +106,8 @@ pub struct EmailDeliverySettingsInputDto {
 #[derive(Deserialize)]
 pub struct PortalPublishSettingsInputDto {
     enabled: bool,
+    payslips_enabled: bool,
+    owner_summary_enabled: bool,
     supabase_url: String,
     supabase_secret_key: String,
 }
@@ -165,6 +169,8 @@ fn to_master_settings_dto(settings: settings_service::MasterSettings) -> MasterS
         },
         portal_publish: PortalPublishSettingsDto {
             enabled: settings.portal_publish.enabled,
+            payslips_enabled: settings.portal_publish.payslips_enabled,
+            owner_summary_enabled: settings.portal_publish.owner_summary_enabled,
             supabase_url: settings.portal_publish.supabase_url,
             supabase_secret_key_set: settings.portal_publish.supabase_secret_key_set,
         },
@@ -215,6 +221,8 @@ fn to_master_settings_input(
         },
         portal_publish: settings_service::PortalPublishSettingsInput {
             enabled: input.portal_publish.enabled,
+            payslips_enabled: input.portal_publish.payslips_enabled,
+            owner_summary_enabled: input.portal_publish.owner_summary_enabled,
             supabase_url: input.portal_publish.supabase_url,
             supabase_secret_key: input.portal_publish.supabase_secret_key,
         },

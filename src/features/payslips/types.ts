@@ -144,6 +144,10 @@ export type PayslipPortalPublishResult = {
   attemptedCount: number;
   publishedCount: number;
   failedCount: number;
+  skippedCount: number;
+  ownerSummaryStatus: "disabled" | "published" | "failed";
+  ownerSummaryId: string;
+  ownerSummaryErrorMessage: string;
   items: PayslipPortalPublishItemResult[];
 };
 

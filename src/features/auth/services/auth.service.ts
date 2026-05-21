@@ -29,6 +29,12 @@ export async function createManagedUser(input: CreateUserInput) {
   return tauriAuthRepository.createUser(input);
 }
 
+export async function createOwnerPortalAccount(
+  input: Parameters<typeof tauriAuthRepository.createOwnerPortalAccount>[0],
+) {
+  return tauriAuthRepository.createOwnerPortalAccount(input);
+}
+
 export async function updateManagedUser(input: UpdateUserInput) {
   return tauriAuthRepository.updateUser(input);
 }

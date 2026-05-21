@@ -28,6 +28,8 @@ export type AuthSession = {
 export type UserManagementItem = AuthUser & {
   credentialSource: AuthCredentialSource;
   lastLoginAt: string | null;
+  portalEmail: string;
+  portalUserId: string;
   status: AuthUserStatus;
 };
 
@@ -40,6 +42,7 @@ export type CreateUserInput = {
   username: string;
   displayName: string;
   role: AuthRole;
+  portalEmail: string;
   password: string;
 };
 
@@ -47,12 +50,31 @@ export type UpdateUserInput = {
   id: string;
   displayName: string;
   role: AuthRole;
+  portalEmail: string;
   status: AuthUserStatus;
 };
 
 export type ResetUserPasswordInput = {
   id: string;
   password: string;
+};
+
+export type CreateOwnerPortalAccountInput = {
+  authUserId: string;
+  temporaryPassword: string;
+  actor: {
+    userId: string;
+    displayName: string;
+    role: AuthRole;
+  };
+};
+
+export type OwnerPortalAccountResult = {
+  authUserId: string;
+  displayName: string;
+  portalEmail: string;
+  portalUserId: string;
+  accountStatus: "created" | "existing";
 };
 
 export type LoginResult =

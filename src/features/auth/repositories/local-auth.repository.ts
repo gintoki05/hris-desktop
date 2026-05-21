@@ -36,6 +36,10 @@ export const localAuthRepository: AuthRepository = {
     throw new Error("Manajemen user hanya bisa disimpan saat aplikasi berjalan sebagai desktop app.");
   },
 
+  async createOwnerPortalAccount() {
+    throw new Error("Akun portal owner hanya bisa dibuat saat aplikasi berjalan sebagai desktop app.");
+  },
+
   async getSession() {
     return readStoredSession();
   },
@@ -137,5 +141,7 @@ function toUserManagementItem(userRecord: LocalAuthUserRecord): UserManagementIt
     credentialSource: "local_seed",
     lastLoginAt: null,
     status: "active",
+    portalEmail: "",
+    portalUserId: "",
   };
 }

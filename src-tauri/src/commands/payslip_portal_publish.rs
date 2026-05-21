@@ -35,12 +35,23 @@ pub struct EmployeePortalCreateAccountInputDto {
     actor: PayslipPortalPublishActorDto,
 }
 
+#[derive(Deserialize)]
+pub struct OwnerPortalCreateAccountInputDto {
+    auth_user_id: String,
+    temporary_password: String,
+    actor: PayslipPortalPublishActorDto,
+}
+
 #[derive(Serialize)]
 pub struct PayslipPortalPublishResultDto {
     period_id: String,
     attempted_count: usize,
     published_count: usize,
     failed_count: usize,
+    skipped_count: usize,
+    owner_summary_status: String,
+    owner_summary_id: String,
+    owner_summary_error_message: String,
     items: Vec<PayslipPortalPublishItemResultDto>,
 }
 
@@ -112,6 +123,15 @@ pub struct EmployeePortalCreateAccountResultDto {
     employee_email: String,
     portal_user_id: String,
     employee_profile_id: String,
+    account_status: String,
+}
+
+#[derive(Serialize)]
+pub struct OwnerPortalCreateAccountResultDto {
+    auth_user_id: String,
+    display_name: String,
+    portal_email: String,
+    portal_user_id: String,
     account_status: String,
 }
 
@@ -213,6 +233,27 @@ pub fn create_employee_portal_account(
     .map_err(|error| error.user_message())
 }
 
+#[tauri::command]
+pub fn create_owner_portal_account(
+    app: AppHandle,
+    input: OwnerPortalCreateAccountInputDto,
+) -> Result<OwnerPortalCreateAccountResultDto, String> {
+    payslip_portal_publish_service::create_owner_portal_account(
+        &app,
+        payslip_portal_publish_service::OwnerPortalCreateAccountInput {
+            auth_user_id: input.auth_user_id,
+            temporary_password: input.temporary_password,
+            actor: payslip_portal_publish_service::PayslipPortalPublishActor {
+                user_id: input.actor.user_id,
+                display_name: input.actor.display_name,
+                role: input.actor.role,
+            },
+        },
+    )
+    .map(to_owner_create_account_result_dto)
+    .map_err(|error| error.user_message())
+}
+
 fn to_result_dto(
     result: payslip_portal_publish_service::PayslipPortalPublishResult,
 ) -> PayslipPortalPublishResultDto {
@@ -221,6 +262,10 @@ fn to_result_dto(
         attempted_count: result.attempted_count,
         published_count: result.published_count,
         failed_count: result.failed_count,
+        skipped_count: result.skipped_count,
+        owner_summary_status: result.owner_summary_status,
+        owner_summary_id: result.owner_summary_id,
+        owner_summary_error_message: result.owner_summary_error_message,
         items: result.items.into_iter().map(to_item_dto).collect(),
     }
 }
@@ -313,6 +358,18 @@ fn to_create_account_result_dto(
         employee_email: result.employee_email,
         portal_user_id: result.portal_user_id,
         employee_profile_id: result.employee_profile_id,
+        account_status: result.account_status,
+    }
+}
+
+fn to_owner_create_account_result_dto(
+    result: payslip_portal_publish_service::OwnerPortalCreateAccountResult,
+) -> OwnerPortalCreateAccountResultDto {
+    OwnerPortalCreateAccountResultDto {
+        auth_user_id: result.auth_user_id,
+        display_name: result.display_name,
+        portal_email: result.portal_email,
+        portal_user_id: result.portal_user_id,
         account_status: result.account_status,
     }
 }

@@ -60,6 +60,8 @@ export type EmailDeliverySettings = {
 
 export type PortalPublishSettings = {
   enabled: boolean;
+  payslipsEnabled: boolean;
+  ownerSummaryEnabled: boolean;
   supabaseUrl: string;
   supabaseSecretKey: string;
   supabaseSecretKeySet: boolean;

@@ -29,18 +29,20 @@ import {
 import { formatLocalDateTimeFromUtc } from "../../../lib/formatters/date-time";
 import { AUTH_ROLE_LABELS } from "../constants";
 import {
+  createOwnerPortalAccount,
   createManagedUser,
   listManagedUsers,
   resetManagedUserPassword,
   updateManagedUser,
 } from "../services/auth.service";
-import type { AuthRole, AuthUserStatus, UserManagementItem } from "../types";
+import type { AuthRole, AuthSession, AuthUserStatus, UserManagementItem } from "../types";
 
 type UserManagementPanelProps = {
   canManage: boolean;
+  session: AuthSession;
 };
 
-type DialogMode = "create" | "edit" | "reset";
+type DialogMode = "create" | "edit" | "reset" | "portal-owner";
 
 type UserFormState = {
   id: string;
@@ -48,6 +50,7 @@ type UserFormState = {
   displayName: string;
   role: AuthRole;
   status: AuthUserStatus;
+  portalEmail: string;
   password: string;
 };
 
@@ -67,10 +70,11 @@ const EMPTY_FORM: UserFormState = {
   displayName: "",
   role: "viewer",
   status: "active",
+  portalEmail: "",
   password: "",
 };
 
-export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
+export function UserManagementPanel({ canManage, session }: UserManagementPanelProps) {
   const [users, setUsers] = useState<UserManagementItem[]>([]);
   const [dialogMode, setDialogMode] = useState<DialogMode | null>(null);
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
@@ -120,6 +124,7 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
           username: form.username,
           displayName: form.displayName,
           role: form.role,
+          portalEmail: form.portalEmail,
           password: form.password,
         });
         setSuccessMessage("User aplikasi berhasil dibuat.");
@@ -130,6 +135,7 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
           id: form.id,
           displayName: form.displayName,
           role: form.role,
+          portalEmail: form.portalEmail,
           status: form.status,
         });
         setSuccessMessage("User aplikasi berhasil diperbarui.");
@@ -141,6 +147,23 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
           password: form.password,
         });
         setSuccessMessage("Password user berhasil direset.");
+      }
+
+      if (dialogMode === "portal-owner") {
+        const result = await createOwnerPortalAccount({
+          authUserId: form.id,
+          temporaryPassword: form.password,
+          actor: {
+            userId: session.user.id,
+            displayName: session.user.displayName,
+            role: session.user.role,
+          },
+        });
+        setSuccessMessage(
+          result.accountStatus === "created"
+            ? `Akun portal owner ${result.displayName} berhasil dibuat.`
+            : `Akun portal owner ${result.displayName} sudah ada dan role owner tersinkron.`,
+        );
       }
 
       await refreshUsers();
@@ -166,9 +189,25 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
       displayName: user.displayName,
       role: user.role,
       status: user.status,
+      portalEmail: user.portalEmail,
       password: "",
     });
     setDialogMode("edit");
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }
+
+  function openPortalOwnerDialog(user: UserManagementItem) {
+    setForm({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.role,
+      status: user.status,
+      portalEmail: user.portalEmail,
+      password: "",
+    });
+    setDialogMode("portal-owner");
     setErrorMessage(null);
     setSuccessMessage(null);
   }
@@ -180,6 +219,7 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
       displayName: user.displayName,
       role: user.role,
       status: user.status,
+      portalEmail: user.portalEmail,
       password: "",
     });
     setDialogMode("reset");
@@ -192,11 +232,12 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
     setForm(EMPTY_FORM);
   }
 
-  const isPasswordRequired = dialogMode === "create" || dialogMode === "reset";
+  const isPasswordRequired = dialogMode === "create" || dialogMode === "reset" || dialogMode === "portal-owner";
   const canSubmit = canManage
     && !isSubmitting
     && form.displayName.trim().length > 0
     && (dialogMode !== "create" || form.username.trim().length >= 3)
+    && (dialogMode !== "portal-owner" || form.portalEmail.trim().length > 0)
     && (!isPasswordRequired || form.password.length >= 8);
 
   return (
@@ -239,6 +280,7 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                 <TableHead>Nama</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Portal Owner</TableHead>
                 <TableHead>Login Terakhir</TableHead>
                 <TableHead>Sumber</TableHead>
                 <TableHead>Aksi</TableHead>
@@ -252,6 +294,18 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                   <TableCell>{AUTH_ROLE_LABELS[user.role]}</TableCell>
                   <TableCell>
                     <StatusBadge>{STATUS_LABELS[user.status]}</StatusBadge>
+                  </TableCell>
+                  <TableCell>
+                    {user.role === "owner_management" ? (
+                      <>
+                        <span className="block">{user.portalEmail || "-"}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {user.portalUserId ? "Terhubung" : "Belum terhubung"}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {user.lastLoginAt ? formatLocalDateTimeFromUtc(user.lastLoginAt) : "-"}
@@ -277,18 +331,29 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                       >
                         Reset
                       </Button>
+                      {user.role === "owner_management" ? (
+                        <Button
+                          disabled={!canManage || user.status !== "active" || !user.portalEmail.trim()}
+                          onClick={() => openPortalOwnerDialog(user)}
+                          size="sm"
+                          type="button"
+                          variant="secondary"
+                        >
+                          {user.portalUserId ? "Sinkron Portal" : "Buat Portal"}
+                        </Button>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
               {!isLoading && users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>Belum ada user aplikasi.</TableCell>
+                  <TableCell colSpan={8}>Belum ada user aplikasi.</TableCell>
                 </TableRow>
               ) : null}
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7}>Membaca daftar user...</TableCell>
+                  <TableCell colSpan={8}>Membaca daftar user...</TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -307,7 +372,9 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
             <DialogHeader>
               <DialogTitle>{getDialogTitle(dialogMode)}</DialogTitle>
               <DialogDescription>
-                Password disimpan sebagai hash di database lokal dan tidak ditampilkan ulang.
+                {dialogMode === "portal-owner"
+                  ? "Akun portal owner dibuat dari user lokal Owner/Manajemen dan login tetap dilakukan di Portal Employees."
+                  : "Password disimpan sebagai hash di database lokal dan tidak ditampilkan ulang."}
               </DialogDescription>
             </DialogHeader>
 
@@ -331,7 +398,7 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                 </div>
               )}
 
-              {dialogMode !== "reset" ? (
+              {dialogMode !== "reset" && dialogMode !== "portal-owner" ? (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="user-display-name">Nama</Label>
@@ -348,7 +415,12 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                     <Label>Role</Label>
                     <Select
                       disabled={isSubmitting}
-                      onValueChange={(value) => setForm((current) => ({ ...current, role: value as AuthRole }))}
+                      onValueChange={(value) =>
+                        setForm((current) => ({
+                          ...current,
+                          role: value as AuthRole,
+                          portalEmail: value === "owner_management" ? current.portalEmail : "",
+                        }))}
                       value={form.role}
                     >
                       <SelectTrigger>
@@ -364,6 +436,21 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                     </Select>
                   </div>
                 </>
+              ) : null}
+
+              {dialogMode !== "reset" && dialogMode !== "portal-owner" && form.role === "owner_management" ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="user-portal-email">Email portal owner</Label>
+                  <Input
+                    autoComplete="email"
+                    disabled={isSubmitting}
+                    id="user-portal-email"
+                    onChange={(event) => setForm((current) => ({ ...current, portalEmail: event.target.value }))}
+                    placeholder="owner@example.com"
+                    type="email"
+                    value={form.portalEmail}
+                  />
+                </div>
               ) : null}
 
               {dialogMode === "edit" ? (
@@ -382,6 +469,16 @@ export function UserManagementPanel({ canManage }: UserManagementPanelProps) {
                       <SelectItem value="inactive">Nonaktif</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              ) : null}
+
+              {dialogMode === "portal-owner" ? (
+                <div className="grid gap-1 rounded-lg border bg-muted/30 p-3 text-sm">
+                  <span className="font-medium text-foreground">{form.displayName}</span>
+                  <span className="text-xs text-muted-foreground">{form.portalEmail || "Email portal belum diisi"}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Portal role akan diset ke Owner/Manajemen.
+                  </span>
                 </div>
               ) : null}
 
@@ -444,6 +541,10 @@ function getDialogTitle(mode: DialogMode | null): string {
 
   if (mode === "reset") {
     return "Reset Password";
+  }
+
+  if (mode === "portal-owner") {
+    return "Buat/Sinkron Akun Portal Owner";
   }
 
   return "Manajemen User";

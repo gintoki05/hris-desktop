@@ -54,6 +54,8 @@ pub struct EmailDeliverySettings {
 #[derive(Clone, PartialEq, Serialize)]
 pub struct PortalPublishSettings {
     pub enabled: bool,
+    pub payslips_enabled: bool,
+    pub owner_summary_enabled: bool,
     pub supabase_url: String,
     pub supabase_secret_key_set: bool,
 }
@@ -71,6 +73,8 @@ pub struct StoredEmailDeliverySettings {
 #[derive(Clone)]
 pub struct StoredPortalPublishSettings {
     pub enabled: bool,
+    pub payslips_enabled: bool,
+    pub owner_summary_enabled: bool,
     pub supabase_url: String,
     pub supabase_secret_key: String,
 }
@@ -127,6 +131,8 @@ pub struct EmailDeliverySettingsInput {
 #[derive(Deserialize)]
 pub struct PortalPublishSettingsInput {
     pub enabled: bool,
+    pub payslips_enabled: bool,
+    pub owner_summary_enabled: bool,
     pub supabase_url: String,
     pub supabase_secret_key: String,
 }
@@ -267,13 +273,17 @@ pub fn update_master_settings(
         UPDATE portal_publish_settings
         SET
             enabled = ?1,
-            supabase_url = ?2,
-            supabase_secret_key = ?3,
+            payslips_enabled = ?2,
+            owner_summary_enabled = ?3,
+            supabase_url = ?4,
+            supabase_secret_key = ?5,
             updated_at = datetime('now')
-        WHERE id = ?4
+        WHERE id = ?6
         ",
         (
             if portal_publish.enabled { 1 } else { 0 },
+            if portal_publish.payslips_enabled { 1 } else { 0 },
+            if portal_publish.owner_summary_enabled { 1 } else { 0 },
             &portal_publish.supabase_url,
             &portal_publish.supabase_secret_key,
             DEFAULT_SETTINGS_ID,
@@ -417,17 +427,21 @@ fn get_stored_portal_publish_settings(
     connection
         .query_row(
             "
-            SELECT enabled, supabase_url, supabase_secret_key
+            SELECT enabled, payslips_enabled, owner_summary_enabled, supabase_url, supabase_secret_key
             FROM portal_publish_settings
             WHERE id = ?1
             ",
             [DEFAULT_SETTINGS_ID],
             |row| {
                 let enabled: i32 = row.get(0)?;
+                let payslips_enabled: i32 = row.get(1)?;
+                let owner_summary_enabled: i32 = row.get(2)?;
                 Ok(StoredPortalPublishSettings {
                     enabled: enabled == 1,
-                    supabase_url: row.get(1)?,
-                    supabase_secret_key: row.get(2)?,
+                    payslips_enabled: payslips_enabled == 1,
+                    owner_summary_enabled: owner_summary_enabled == 1,
+                    supabase_url: row.get(3)?,
+                    supabase_secret_key: row.get(4)?,
                 })
             },
         )
@@ -449,6 +463,8 @@ fn public_email_delivery_settings(settings: &StoredEmailDeliverySettings) -> Ema
 fn public_portal_publish_settings(settings: &StoredPortalPublishSettings) -> PortalPublishSettings {
     PortalPublishSettings {
         enabled: settings.enabled,
+        payslips_enabled: settings.payslips_enabled,
+        owner_summary_enabled: settings.owner_summary_enabled,
         supabase_url: settings.supabase_url.clone(),
         supabase_secret_key_set: !settings.supabase_secret_key.trim().is_empty(),
     }
@@ -614,6 +630,8 @@ fn normalize_portal_publish_input(
     };
     let settings = StoredPortalPublishSettings {
         enabled: input.enabled,
+        payslips_enabled: input.payslips_enabled,
+        owner_summary_enabled: input.owner_summary_enabled,
         supabase_url: input.supabase_url.trim().trim_end_matches('/').to_string(),
         supabase_secret_key: secret_key,
     };
@@ -621,6 +639,11 @@ fn normalize_portal_publish_input(
     if settings.enabled {
         validate_required("Supabase URL Portal ESS", &settings.supabase_url)?;
         validate_required("Supabase Secret Key Portal ESS", &settings.supabase_secret_key)?;
+        if !settings.payslips_enabled && !settings.owner_summary_enabled {
+            return Err(AppError::Database(
+                "minimal satu jenis publish portal harus aktif".to_string(),
+            ));
+        }
     }
 
     if !settings.supabase_url.is_empty()
@@ -801,6 +824,8 @@ fn changed_field_names(
     push_if_changed(
         &mut fields,
         previous_portal_publish.enabled != portal_publish.enabled
+            || previous_portal_publish.payslips_enabled != portal_publish.payslips_enabled
+            || previous_portal_publish.owner_summary_enabled != portal_publish.owner_summary_enabled
             || previous_portal_publish.supabase_url != portal_publish.supabase_url
             || previous_portal_publish.supabase_secret_key != portal_publish.supabase_secret_key,
         "Portal ESS Supabase",

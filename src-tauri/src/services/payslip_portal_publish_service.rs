@@ -1,11 +1,11 @@
-use std::{env, fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 
 use reqwest::blocking::{Client, Response};
 use reqwest::StatusCode;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::{
     error::AppError,
@@ -40,6 +40,13 @@ pub struct EmployeePortalCreateAccountInput {
 }
 
 #[derive(Deserialize)]
+pub struct OwnerPortalCreateAccountInput {
+    pub auth_user_id: String,
+    pub temporary_password: String,
+    pub actor: PayslipPortalPublishActor,
+}
+
+#[derive(Deserialize)]
 pub struct PayslipPortalPublishActor {
     pub user_id: String,
     pub display_name: String,
@@ -52,6 +59,10 @@ pub struct PayslipPortalPublishResult {
     pub attempted_count: usize,
     pub published_count: usize,
     pub failed_count: usize,
+    pub skipped_count: usize,
+    pub owner_summary_status: String,
+    pub owner_summary_id: String,
+    pub owner_summary_error_message: String,
     pub items: Vec<PayslipPortalPublishItemResult>,
 }
 
@@ -126,17 +137,21 @@ pub struct EmployeePortalCreateAccountResult {
     pub account_status: String,
 }
 
+#[derive(Serialize)]
+pub struct OwnerPortalCreateAccountResult {
+    pub auth_user_id: String,
+    pub display_name: String,
+    pub portal_email: String,
+    pub portal_user_id: String,
+    pub account_status: String,
+}
+
 #[derive(Clone)]
 struct PublishConfig {
     supabase_url: String,
     api_key: String,
-    api_key_kind: SupabaseApiKeyKind,
-}
-
-#[derive(Clone, Copy)]
-enum SupabaseApiKeyKind {
-    Secret,
-    LegacyServiceRole,
+    payslips_enabled: bool,
+    owner_summary_enabled: bool,
 }
 
 struct FinalPayslipSnapshot {
@@ -152,6 +167,35 @@ struct FinalPayslipSnapshot {
     period_end: String,
     net_pay: i64,
     pdf_file_path: String,
+    snapshot_json: String,
+    portal_publish_status: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SafePayslipSnapshot {
+    payroll: SafePayrollSnapshot,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SafePayrollSnapshot {
+    gross_pay: i64,
+    total_deductions: i64,
+    net_pay: i64,
+    income_components: Vec<SafePayrollComponent>,
+    deduction_components: Vec<SafePayrollComponent>,
+}
+
+#[derive(Deserialize)]
+struct SafePayrollComponent {
+    name: String,
+    amount: i64,
+}
+
+#[derive(Deserialize)]
+struct OwnerPayrollSummaryRow {
+    id: String,
 }
 
 #[derive(Deserialize)]
@@ -201,6 +245,13 @@ struct LocalEmployeePortalStatus {
     portal_user_id: String,
 }
 
+struct LocalOwnerPortalUser {
+    auth_user_id: String,
+    display_name: String,
+    portal_email: String,
+    portal_user_id: String,
+}
+
 pub fn publish_final_payslips_to_portal(
     app: &AppHandle,
     input: PayslipPortalPublishInput,
@@ -225,40 +276,73 @@ pub fn publish_final_payslips_to_portal(
     let client = Client::new();
     let mut items = Vec::new();
     let mut published_count = 0usize;
+    let mut skipped_count = 0usize;
 
-    for snapshot in snapshots {
-        let result = publish_one_snapshot(&client, &config, &snapshot);
-        match result {
-            Ok((storage_path, payslip_id)) => {
-                update_local_publish_success(&connection, &snapshot.id, &storage_path, &payslip_id)?;
-                published_count += 1;
-                items.push(PayslipPortalPublishItemResult {
-                    snapshot_id: snapshot.id,
-                    employee_name: snapshot.employee_name,
-                    status: "published".to_string(),
-                    storage_path,
-                    error_message: String::new(),
-                });
+    if config.payslips_enabled {
+        for snapshot in &snapshots {
+            if snapshot.portal_publish_status == "published" {
+                skipped_count += 1;
+                continue;
             }
-            Err(error) => {
-                let message = sanitize_error_message(&error.user_message());
-                update_local_publish_failure(&connection, &snapshot.id, &message)?;
-                items.push(PayslipPortalPublishItemResult {
-                    snapshot_id: snapshot.id,
-                    employee_name: snapshot.employee_name,
-                    status: "failed".to_string(),
-                    storage_path: String::new(),
-                    error_message: message,
-                });
+
+            let result = publish_one_snapshot(&client, &config, snapshot);
+            match result {
+                Ok((storage_path, payslip_id)) => {
+                    update_local_publish_success(&connection, &snapshot.id, &storage_path, &payslip_id)?;
+                    published_count += 1;
+                    items.push(PayslipPortalPublishItemResult {
+                        snapshot_id: snapshot.id.clone(),
+                        employee_name: snapshot.employee_name.clone(),
+                        status: "published".to_string(),
+                        storage_path,
+                        error_message: String::new(),
+                    });
+                }
+                Err(error) => {
+                    let message = sanitize_error_message(&error.user_message());
+                    update_local_publish_failure(&connection, &snapshot.id, &message)?;
+                    items.push(PayslipPortalPublishItemResult {
+                        snapshot_id: snapshot.id.clone(),
+                        employee_name: snapshot.employee_name.clone(),
+                        status: "failed".to_string(),
+                        storage_path: String::new(),
+                        error_message: message,
+                    });
+                }
             }
         }
     }
+    let failed_count = items.len().saturating_sub(published_count);
+    let (owner_summary_status, owner_summary_id, owner_summary_error_message) =
+        if config.owner_summary_enabled {
+            match publish_owner_payroll_summary(
+                &client,
+                &config,
+                &period_id,
+                &snapshots,
+                published_count + skipped_count,
+                failed_count,
+            ) {
+                Ok(summary_id) => ("published".to_string(), summary_id, String::new()),
+                Err(error) => (
+                    "failed".to_string(),
+                    String::new(),
+                    sanitize_error_message(&error.user_message()),
+                ),
+            }
+        } else {
+            ("disabled".to_string(), String::new(), String::new())
+        };
 
     Ok(PayslipPortalPublishResult {
         period_id,
         attempted_count: items.len(),
         published_count,
-        failed_count: items.len().saturating_sub(published_count),
+        failed_count,
+        skipped_count,
+        owner_summary_status,
+        owner_summary_id,
+        owner_summary_error_message,
         items,
     })
 }
@@ -538,6 +622,73 @@ pub fn create_employee_portal_account(
     })
 }
 
+pub fn create_owner_portal_account(
+    app: &AppHandle,
+    input: OwnerPortalCreateAccountInput,
+) -> Result<OwnerPortalCreateAccountResult, AppError> {
+    database_service::initialize_local_database(app)?;
+    validate_actor(&input.actor)?;
+    let auth_user_id = input.auth_user_id.trim().to_string();
+    let temporary_password = input.temporary_password.trim().to_string();
+    if auth_user_id.is_empty() {
+        return Err(AppError::Database("user owner wajib dipilih".to_string()));
+    }
+    if temporary_password.len() < 8 {
+        return Err(AppError::Supabase(
+            "password sementara minimal 8 karakter".to_string(),
+        ));
+    }
+
+    let config = read_publish_config(app)?;
+    let connection = database_service::open_local_connection(app)?;
+    let owner = get_local_owner_for_portal(&connection, &auth_user_id)?;
+    if owner.portal_email.trim().is_empty() {
+        return Err(AppError::Supabase(
+            "email portal owner wajib diisi di Manajemen User".to_string(),
+        ));
+    }
+
+    let client = Client::new();
+    let existing_user_id = if owner.portal_user_id.trim().is_empty() {
+        find_auth_user_id_by_email(&client, &config, &owner.portal_email)?
+    } else {
+        Some(owner.portal_user_id.clone())
+    };
+    let (portal_user_id, account_status) = if let Some(user_id) = existing_user_id {
+        set_auth_user_app_role(&client, &config, &user_id, "owner_management")?;
+        (user_id, "existing".to_string())
+    } else {
+        (
+            create_auth_user_with_app_role(
+                &client,
+                &config,
+                &owner.portal_email,
+                &temporary_password,
+                &owner.display_name,
+                "owner_management",
+            )?,
+            "created".to_string(),
+        )
+    };
+
+    connection.execute(
+        "
+        UPDATE auth_users
+        SET portal_user_id = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        WHERE id = ?2
+        ",
+        params![&portal_user_id, &owner.auth_user_id],
+    )?;
+
+    Ok(OwnerPortalCreateAccountResult {
+        auth_user_id: owner.auth_user_id,
+        display_name: owner.display_name,
+        portal_email: mask_email_for_ui(&owner.portal_email),
+        portal_user_id,
+        account_status,
+    })
+}
+
 fn publish_one_snapshot(
     client: &Client,
     config: &PublishConfig,
@@ -771,6 +922,93 @@ fn upsert_payslip_row(
         .ok_or_else(|| AppError::Supabase("payslip tersimpan tetapi ID tidak dikembalikan".to_string()))
 }
 
+fn publish_owner_payroll_summary(
+    client: &Client,
+    config: &PublishConfig,
+    period_id: &str,
+    snapshots: &[FinalPayslipSnapshot],
+    published_count: usize,
+    failed_count: usize,
+) -> Result<String, AppError> {
+    let first_snapshot = snapshots.first().ok_or_else(|| {
+        AppError::Database("periode payroll final belum memiliki snapshot slip".to_string())
+    })?;
+    let mut gross_pay = 0i64;
+    let mut total_deductions = 0i64;
+    let mut net_pay = 0i64;
+    let mut income_components = BTreeMap::<String, i64>::new();
+    let mut deduction_components = BTreeMap::<String, i64>::new();
+
+    for snapshot in snapshots {
+        let parsed: SafePayslipSnapshot = serde_json::from_str(&snapshot.snapshot_json).map_err(|_| {
+            AppError::Database("snapshot payroll final tidak bisa dibaca untuk laporan owner".to_string())
+        })?;
+        gross_pay += parsed.payroll.gross_pay;
+        total_deductions += parsed.payroll.total_deductions;
+        net_pay += parsed.payroll.net_pay;
+
+        for component in parsed.payroll.income_components {
+            let name = component.name.trim();
+            if !name.is_empty() {
+                *income_components.entry(name.to_string()).or_default() += component.amount;
+            }
+        }
+
+        for component in parsed.payroll.deduction_components {
+            let name = component.name.trim();
+            if !name.is_empty() {
+                *deduction_components.entry(name.to_string()).or_default() += component.amount;
+            }
+        }
+    }
+
+    let previously_published_count = snapshots
+        .iter()
+        .filter(|snapshot| snapshot.portal_publish_status == "published")
+        .count();
+    let current_published_count = if config.payslips_enabled {
+        published_count
+    } else {
+        previously_published_count
+    };
+    let body = json!({
+        "desktop_period_id": period_id,
+        "payroll_period": first_snapshot.payroll_period,
+        "period_start": first_snapshot.period_start,
+        "period_end": first_snapshot.period_end,
+        "employee_count": snapshots.len(),
+        "gross_pay": gross_pay,
+        "total_deductions": total_deductions,
+        "net_pay": net_pay,
+        "income_components": to_component_summary_json(income_components),
+        "deduction_components": to_component_summary_json(deduction_components),
+        "payslip_published_count": current_published_count,
+        "payslip_failed_count": failed_count
+    });
+    let response = authed_request(
+        client
+            .post(rest_url(config, "payroll_report_summaries"))
+            .query(&[("on_conflict", "desktop_period_id"), ("select", "id")])
+            .header("Prefer", "resolution=merge-duplicates,return=representation")
+            .json(&body),
+        config,
+    )
+    .send()
+    .map_err(|_| AppError::Supabase("publish laporan owner gagal terhubung ke Supabase".to_string()))?;
+    let rows: Vec<OwnerPayrollSummaryRow> = parse_json_response(response, "publish laporan owner")?;
+    rows.into_iter()
+        .next()
+        .map(|row| row.id)
+        .ok_or_else(|| AppError::Supabase("laporan owner tersimpan tetapi ID tidak dikembalikan".to_string()))
+}
+
+fn to_component_summary_json(components: BTreeMap<String, i64>) -> Vec<serde_json::Value> {
+    components
+        .into_iter()
+        .map(|(name, amount)| json!({ "name": name, "amount": amount }))
+        .collect()
+}
+
 fn list_final_snapshots(
     connection: &rusqlite::Connection,
     period_id: &str,
@@ -789,7 +1027,9 @@ fn list_final_snapshots(
             pp.start_date,
             pp.end_date,
             ps.net_pay,
-            ps.pdf_file_path
+            ps.pdf_file_path,
+            ps.snapshot_json,
+            ps.portal_publish_status
         FROM payslip_snapshots ps
         JOIN payslip_periods pp ON pp.id = ps.period_id
         LEFT JOIN employees e ON e.id = ps.employee_id
@@ -811,6 +1051,8 @@ fn list_final_snapshots(
             period_end: row.get(9)?,
             net_pay: row.get(10)?,
             pdf_file_path: row.get(11)?,
+            snapshot_json: row.get(12)?,
+            portal_publish_status: row.get(13)?,
         })
     })?;
 
@@ -875,6 +1117,36 @@ fn list_local_employees_for_portal_status(
     }
 
     Ok(employees)
+}
+
+fn get_local_owner_for_portal(
+    connection: &rusqlite::Connection,
+    auth_user_id: &str,
+) -> Result<LocalOwnerPortalUser, AppError> {
+    connection
+        .query_row(
+            "
+            SELECT id, display_name, portal_email, portal_user_id
+            FROM auth_users
+            WHERE id = ?1
+                AND role_id = 'owner_management'
+                AND is_active = 1
+            ",
+            [auth_user_id],
+            |row| {
+                Ok(LocalOwnerPortalUser {
+                    auth_user_id: row.get(0)?,
+                    display_name: row.get(1)?,
+                    portal_email: row.get(2)?,
+                    portal_user_id: row.get(3)?,
+                })
+            },
+        )
+        .map_err(|_| {
+            AppError::Database(
+                "user Owner/Manajemen aktif tidak ditemukan di Manajemen User".to_string(),
+            )
+        })
 }
 
 struct LocalEmployeePortalLink {
@@ -1039,12 +1311,26 @@ fn create_auth_user(
     temporary_password: &str,
     employee_name: &str,
 ) -> Result<String, AppError> {
+    create_auth_user_with_app_role(client, config, email, temporary_password, employee_name, "employee")
+}
+
+fn create_auth_user_with_app_role(
+    client: &Client,
+    config: &PublishConfig,
+    email: &str,
+    temporary_password: &str,
+    display_name: &str,
+    app_role: &str,
+) -> Result<String, AppError> {
     let body = json!({
         "email": email,
         "password": temporary_password,
         "email_confirm": true,
+        "app_metadata": {
+            "role": app_role
+        },
         "user_metadata": {
-            "display_name": employee_name
+            "display_name": display_name
         }
     });
     let response = authed_request(
@@ -1067,6 +1353,28 @@ fn create_auth_user(
         })
         .map(|id| id.to_string())
         .ok_or_else(|| AppError::Supabase("akun portal dibuat tetapi user ID tidak dikembalikan".to_string()))
+}
+
+fn set_auth_user_app_role(
+    client: &Client,
+    config: &PublishConfig,
+    user_id: &str,
+    app_role: &str,
+) -> Result<(), AppError> {
+    let body = json!({
+        "app_metadata": {
+            "role": app_role
+        }
+    });
+    let response = authed_request(
+        client
+            .put(format!("{}/auth/v1/admin/users/{user_id}", config.supabase_url))
+            .json(&body),
+        config,
+    )
+    .send()
+    .map_err(|_| AppError::Supabase("set role akun portal gagal terhubung ke Supabase Auth".to_string()))?;
+    ensure_success_response(response, "set role akun portal")
 }
 
 fn list_auth_users(client: &Client, config: &PublishConfig) -> Result<Vec<AuthUserRow>, AppError> {
@@ -1156,54 +1464,31 @@ fn mask_identifier(value: &str) -> String {
 }
 
 fn read_publish_config(app: &AppHandle) -> Result<PublishConfig, AppError> {
-    if let Ok(settings) = settings_service::get_portal_publish_settings(app) {
-        let supabase_url = settings.supabase_url.trim().trim_end_matches('/').to_string();
-        let api_key = settings.supabase_secret_key.trim().to_string();
+    let settings = settings_service::get_portal_publish_settings(app)?;
+    let supabase_url = settings.supabase_url.trim().trim_end_matches('/').to_string();
+    let api_key = settings.supabase_secret_key.trim().to_string();
 
-        if settings.enabled {
-            if supabase_url.is_empty() || api_key.is_empty() {
-                return Err(AppError::Supabase(portal_config_missing_message()));
-            }
-
-            return Ok(PublishConfig {
-                supabase_url,
-                api_key,
-                api_key_kind: SupabaseApiKeyKind::Secret,
-            });
-        }
-
-        if !supabase_url.is_empty() || !api_key.is_empty() {
-            return Err(AppError::Supabase(
-                "Portal ESS belum diaktifkan. Aktifkan publish portal di Pengaturan sebelum publish slip.".to_string(),
-            ));
-        }
+    if !settings.enabled {
+        return Err(AppError::Supabase(
+            "Portal ESS belum diaktifkan. Aktifkan publish portal di Pengaturan sebelum publish.".to_string(),
+        ));
     }
 
-    read_publish_config_from_env(app).map_err(|_| AppError::Supabase(portal_config_missing_message()))
-}
-
-fn read_publish_config_from_env(app: &AppHandle) -> Result<PublishConfig, AppError> {
-    let supabase_url = read_secret_config(app, "SUPABASE_URL")?
-        .trim_end_matches('/')
-        .to_string();
-    let (api_key, api_key_kind) = match read_secret_config(app, "SUPABASE_SECRET_KEY") {
-        Ok(value) => (value, SupabaseApiKeyKind::Secret),
-        Err(_) => (
-            read_secret_config(app, "SUPABASE_SERVICE_ROLE_KEY")?,
-            SupabaseApiKeyKind::LegacyServiceRole,
-        ),
-    };
-
     if supabase_url.is_empty() || api_key.is_empty() {
+        return Err(AppError::Supabase(portal_config_missing_message()));
+    }
+
+    if !settings.payslips_enabled && !settings.owner_summary_enabled {
         return Err(AppError::Supabase(
-            "SUPABASE_URL dan SUPABASE_SECRET_KEY wajib dikonfigurasi untuk proses desktop admin".to_string(),
+            "minimal satu jenis publish portal harus aktif".to_string(),
         ));
     }
 
     Ok(PublishConfig {
         supabase_url,
         api_key,
-        api_key_kind,
+        payslips_enabled: settings.payslips_enabled,
+        owner_summary_enabled: settings.owner_summary_enabled,
     })
 }
 
@@ -1211,90 +1496,11 @@ fn portal_config_missing_message() -> String {
     "Konfigurasi Portal ESS belum lengkap. Isi Supabase URL dan Secret Key di Pengaturan.".to_string()
 }
 
-fn read_secret_config(app: &AppHandle, key: &str) -> Result<String, AppError> {
-    if let Ok(value) = env::var(key) {
-        let trimmed = value.trim().to_string();
-        if !trimmed.is_empty() {
-            return Ok(trimmed);
-        }
-    }
-
-    for directory in candidate_config_directories(app) {
-        for file_name in [".env.local", ".env"] {
-            let path = directory.join(file_name);
-            let Ok(content) = fs::read_to_string(path) else {
-                continue;
-            };
-
-            if let Some(value) = read_key_from_env_file(&content, key) {
-                return Ok(value);
-            }
-        }
-    }
-
-    Err(AppError::Supabase(format!("{key} belum dikonfigurasi")))
-}
-
-fn candidate_config_directories(app: &AppHandle) -> Vec<PathBuf> {
-    let mut directories = Vec::new();
-
-    if let Ok(current_dir) = env::current_dir() {
-        push_unique_directory(&mut directories, current_dir.clone());
-        if let Some(parent) = current_dir.parent() {
-            push_unique_directory(&mut directories, parent.to_path_buf());
-        }
-    }
-
-    if let Ok(exe_path) = env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            push_unique_directory(&mut directories, exe_dir.to_path_buf());
-            if let Some(parent) = exe_dir.parent() {
-                push_unique_directory(&mut directories, parent.to_path_buf());
-            }
-        }
-    }
-
-    if let Ok(app_config_dir) = app.path().app_config_dir() {
-        push_unique_directory(&mut directories, app_config_dir);
-    }
-
-    directories
-}
-
-fn push_unique_directory(directories: &mut Vec<PathBuf>, directory: PathBuf) {
-    if !directories.iter().any(|item| item == &directory) {
-        directories.push(directory);
-    }
-}
-
-fn read_key_from_env_file(content: &str, key: &str) -> Option<String> {
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-
-        let Some((candidate_key, candidate_value)) = trimmed.split_once('=') else {
-            continue;
-        };
-
-        if candidate_key.trim() == key {
-            return Some(candidate_value.trim().trim_matches('"').trim_matches('\'').to_string());
-        }
-    }
-
-    None
-}
-
 fn authed_request(
     builder: reqwest::blocking::RequestBuilder,
     config: &PublishConfig,
 ) -> reqwest::blocking::RequestBuilder {
-    let builder = builder.header("apikey", &config.api_key);
-    match config.api_key_kind {
-        SupabaseApiKeyKind::LegacyServiceRole => builder.bearer_auth(&config.api_key),
-        SupabaseApiKeyKind::Secret => builder,
-    }
+    builder.header("apikey", &config.api_key)
 }
 
 fn rest_url(config: &PublishConfig, table: &str) -> String {

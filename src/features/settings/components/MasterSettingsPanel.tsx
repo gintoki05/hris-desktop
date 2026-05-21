@@ -75,6 +75,15 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
       setSuccessMessage(null);
       return;
     }
+    if (
+      draft.portalPublish.enabled
+      && !draft.portalPublish.payslipsEnabled
+      && !draft.portalPublish.ownerSummaryEnabled
+    ) {
+      setErrorMessage("Pilih minimal satu jenis data portal: slip karyawan atau laporan owner.");
+      setSuccessMessage(null);
+      return;
+    }
 
     setIsSaving(true);
     setErrorMessage(null);
@@ -356,7 +365,23 @@ export function MasterSettingsPanel({ canEdit, onSettingsSaved, session }: Maste
                     checked={draft.portalPublish.enabled}
                     onCheckedChange={(checked) => updatePortalPublishField("enabled", checked === true)}
                   />
-                  Aktifkan publish slip ke Portal ESS
+                  Aktifkan publish ke Portal ESS
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Checkbox
+                    checked={draft.portalPublish.payslipsEnabled}
+                    disabled={!draft.portalPublish.enabled}
+                    onCheckedChange={(checked) => updatePortalPublishField("payslipsEnabled", checked === true)}
+                  />
+                  Publish slip karyawan final
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Checkbox
+                    checked={draft.portalPublish.ownerSummaryEnabled}
+                    disabled={!draft.portalPublish.enabled}
+                    onCheckedChange={(checked) => updatePortalPublishField("ownerSummaryEnabled", checked === true)}
+                  />
+                  Publish laporan owner ringkas
                 </label>
                 <label>
                   Supabase URL

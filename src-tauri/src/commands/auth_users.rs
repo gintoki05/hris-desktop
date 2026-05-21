@@ -12,6 +12,8 @@ pub struct AuthUserDto {
     status: String,
     credential_source: String,
     last_login_at: Option<String>,
+    portal_email: String,
+    portal_user_id: String,
 }
 
 #[derive(Serialize)]
@@ -39,6 +41,7 @@ pub struct CreateUserInputDto {
     display_name: String,
     role: String,
     password: String,
+    portal_email: String,
 }
 
 #[derive(Deserialize)]
@@ -47,6 +50,7 @@ pub struct UpdateUserInputDto {
     display_name: String,
     role: String,
     status: String,
+    portal_email: String,
 }
 
 #[derive(Deserialize)]
@@ -95,6 +99,7 @@ pub fn create_auth_user(app: AppHandle, input: CreateUserInputDto) -> Result<Aut
             display_name: input.display_name,
             role: input.role,
             password: input.password,
+            portal_email: input.portal_email,
         },
     )
     .map(to_user_dto)
@@ -110,6 +115,7 @@ pub fn update_auth_user(app: AppHandle, input: UpdateUserInputDto) -> Result<Aut
             display_name: input.display_name,
             role: input.role,
             status: input.status,
+            portal_email: input.portal_email,
         },
     )
     .map(to_user_dto)
@@ -148,5 +154,7 @@ fn to_user_dto(user: auth_user_service::AuthUser) -> AuthUserDto {
         status: user.status,
         credential_source: user.credential_source,
         last_login_at: user.last_login_at,
+        portal_email: user.portal_email,
+        portal_user_id: user.portal_user_id,
     }
 }

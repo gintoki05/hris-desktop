@@ -19,6 +19,8 @@ pub struct AuthUser {
     pub status: String,
     pub credential_source: String,
     pub last_login_at: Option<String>,
+    pub portal_email: String,
+    pub portal_user_id: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -39,6 +41,7 @@ pub struct CreateUserInput {
     pub display_name: String,
     pub role: String,
     pub password: String,
+    pub portal_email: String,
 }
 
 #[derive(Deserialize)]
@@ -47,6 +50,7 @@ pub struct UpdateUserInput {
     pub display_name: String,
     pub role: String,
     pub status: String,
+    pub portal_email: String,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +69,8 @@ struct StoredAuthUser {
     password_algorithm: String,
     is_active: bool,
     last_login_at: Option<String>,
+    portal_email: String,
+    portal_user_id: String,
 }
 
 pub fn list_users(app: &AppHandle) -> Result<Vec<AuthUser>, AppError> {
@@ -72,7 +78,7 @@ pub fn list_users(app: &AppHandle) -> Result<Vec<AuthUser>, AppError> {
     let connection = database_service::open_local_connection(app)?;
     let mut statement = connection.prepare(
         "
-        SELECT id, username, display_name, role_id, is_active, last_login_at
+        SELECT id, username, display_name, role_id, is_active, last_login_at, portal_email, portal_user_id
         FROM auth_users
         ORDER BY
             CASE role_id
@@ -94,6 +100,8 @@ pub fn list_users(app: &AppHandle) -> Result<Vec<AuthUser>, AppError> {
             status: if is_active == 1 { "active" } else { "inactive" }.to_string(),
             credential_source: "sqlite".to_string(),
             last_login_at: row.get(5)?,
+            portal_email: row.get(6)?,
+            portal_user_id: row.get(7)?,
         })
     })?;
 
@@ -150,6 +158,7 @@ pub fn create_user(app: &AppHandle, input: CreateUserInput) -> Result<AuthUser, 
     let display_name = normalize_display_name(&input.display_name)?;
     validate_role(&input.role)?;
     validate_new_password(&input.password)?;
+    let portal_email = normalize_portal_email_for_role(&input.portal_email, &input.role)?;
 
     let mut connection = database_service::open_local_connection(app)?;
     let transaction = connection.transaction()?;
@@ -179,10 +188,11 @@ pub fn create_user(app: &AppHandle, input: CreateUserInput) -> Result<AuthUser, 
             password_salt,
             password_algorithm,
             is_active,
+            portal_email,
             created_at,
             updated_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, datetime('now'), datetime('now'))
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, datetime('now'), datetime('now'))
         ",
         (
             &user_id,
@@ -192,6 +202,7 @@ pub fn create_user(app: &AppHandle, input: CreateUserInput) -> Result<AuthUser, 
             &password_hash,
             &salt,
             PASSWORD_ALGORITHM,
+            &portal_email,
         ),
     )?;
     transaction.commit()?;
@@ -205,6 +216,7 @@ pub fn update_user(app: &AppHandle, input: UpdateUserInput) -> Result<AuthUser, 
     let display_name = normalize_display_name(&input.display_name)?;
     validate_role(&input.role)?;
     validate_status(&input.status)?;
+    let portal_email = normalize_portal_email_for_role(&input.portal_email, &input.role)?;
 
     let mut connection = database_service::open_local_connection(app)?;
     let transaction = connection.transaction()?;
@@ -218,10 +230,16 @@ pub fn update_user(app: &AppHandle, input: UpdateUserInput) -> Result<AuthUser, 
     transaction.execute(
         "
         UPDATE auth_users
-        SET display_name = ?1, role_id = ?2, is_active = ?3, updated_at = datetime('now')
-        WHERE id = ?4
+        SET
+            display_name = ?1,
+            role_id = ?2,
+            is_active = ?3,
+            portal_email = ?4,
+            portal_user_id = CASE WHEN ?2 = 'owner_management' THEN portal_user_id ELSE '' END,
+            updated_at = datetime('now')
+        WHERE id = ?5
         ",
-        (&display_name, &input.role, if is_active { 1 } else { 0 }, &user_id),
+        (&display_name, &input.role, if is_active { 1 } else { 0 }, &portal_email, &user_id),
     )?;
 
     if input.role != "admin_payroll" {
@@ -285,7 +303,7 @@ fn get_stored_user(
 ) -> Result<Option<StoredAuthUser>, AppError> {
     let sql = format!(
         "
-        SELECT id, username, display_name, role_id, password_hash, password_salt, password_algorithm, is_active, last_login_at
+        SELECT id, username, display_name, role_id, password_hash, password_salt, password_algorithm, is_active, last_login_at, portal_email, portal_user_id
         FROM auth_users
         WHERE {column} = ?1
         "
@@ -304,6 +322,8 @@ fn get_stored_user(
                 password_algorithm: row.get(6)?,
                 is_active: is_active == 1,
                 last_login_at: row.get(8)?,
+                portal_email: row.get(9)?,
+                portal_user_id: row.get(10)?,
             })
         })
         .optional()
@@ -405,6 +425,8 @@ fn to_auth_user(user: StoredAuthUser) -> AuthUser {
         status: if user.is_active { "active" } else { "inactive" }.to_string(),
         credential_source: "sqlite".to_string(),
         last_login_at: user.last_login_at,
+        portal_email: user.portal_email,
+        portal_user_id: user.portal_user_id,
     }
 }
 
@@ -454,6 +476,25 @@ fn validate_role(value: &str) -> Result<(), AppError> {
         Ok(())
     } else {
         Err(AppError::Database("role user tidak valid".to_string()))
+    }
+}
+
+fn normalize_portal_email_for_role(value: &str, role: &str) -> Result<String, AppError> {
+    let email = value.trim().to_lowercase();
+    if email.is_empty() {
+        return Ok(email);
+    }
+
+    if role != "owner_management" {
+        return Err(AppError::Database(
+            "email portal hanya dipakai untuk role Owner/Manajemen".to_string(),
+        ));
+    }
+
+    if email.contains('@') && email.rsplit('@').next().is_some_and(|domain| domain.contains('.')) {
+        Ok(email)
+    } else {
+        Err(AppError::Database("email portal owner tidak valid".to_string()))
     }
 }
 
