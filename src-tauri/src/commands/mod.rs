@@ -1,5 +1,6 @@
 pub mod attendance_master;
 pub mod attendance_import;
+pub mod attendance_summary;
 pub mod auth_users;
 pub mod backup;
 pub mod database;

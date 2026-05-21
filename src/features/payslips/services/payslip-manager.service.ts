@@ -1,7 +1,9 @@
 import type { AuthSession } from "../../auth/types";
 import {
+  deletePayslipPeriod as deletePeriodWithRepository,
   exportPayslipTemplateFile as exportTemplateFileWithRepository,
   generatePayslipPdfs as generatePdfsWithRepository,
+  getOwnerSummaryPublishStatus as getOwnerSummaryPublishStatusWithRepository,
   listPayslipPeriods as listPeriodsWithRepository,
   listPayslipPortalStatus as listPortalStatusWithRepository,
   listPayslipSnapshots as listSnapshotsWithRepository,
@@ -11,6 +13,8 @@ import {
   updatePayslipSnapshotSendStatus as updateSnapshotStatusWithRepository,
 } from "../repositories/tauri-payslip-manager.repository";
 import type {
+  DeletedPayslipPeriod,
+  OwnerSummaryPublishStatus,
   PayslipImportBatch,
   PayslipImportBatchInput,
   PayslipManagerSnapshot,
@@ -76,6 +80,20 @@ export function publishFinalPayslipsToPortal(
   session: AuthSession,
 ): Promise<PayslipPortalPublishResult> {
   return publishToPortalWithRepository(periodId, toActor(session));
+}
+
+export function getOwnerSummaryPublishStatus(
+  periodId: string,
+  session: AuthSession,
+): Promise<OwnerSummaryPublishStatus | null> {
+  return getOwnerSummaryPublishStatusWithRepository(periodId, toActor(session));
+}
+
+export function deletePayslipPeriod(
+  periodId: string,
+  session: AuthSession,
+): Promise<DeletedPayslipPeriod> {
+  return deletePeriodWithRepository(periodId, toActor(session));
 }
 
 export function listPayslipPortalStatus(

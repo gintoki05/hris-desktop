@@ -200,9 +200,9 @@ export function ReportsPanel() {
           <>
             <div className="grid gap-3 md:grid-cols-4">
               <SummaryMetric label="Karyawan" value={`${report.employeeCount} orang`} />
-              <SummaryMetric label="Total Penghasilan Bruto" value={formatRupiah(report.grossPay)} />
-              <SummaryMetric label="Jumlah Potongan" value={formatRupiah(report.totalDeductions)} />
-              <SummaryMetric label="Gaji Bersih" value={formatRupiah(report.netPay)} />
+              <SummaryMetric label="Total Komponen Gaji" value={formatRupiah(report.grossPay)} />
+              <SummaryMetric label="Total Potongan" value={formatRupiah(report.totalDeductions)} />
+              <SummaryMetric label="Total Gaji Bersih Dibayarkan" value={formatRupiah(report.netPay)} />
             </div>
 
             <div className="grid gap-3 lg:grid-cols-2">
@@ -234,9 +234,9 @@ export function ReportsPanel() {
                       <TableHead>NIK</TableHead>
                       <TableHead>Nama</TableHead>
                       <TableHead>Jabatan</TableHead>
-                      <TableHead className="text-right">Penghasilan Bruto</TableHead>
+                      <TableHead className="text-right">Total Komponen Gaji</TableHead>
                       <TableHead className="text-right">Potongan</TableHead>
-                      <TableHead className="text-right">Gaji Bersih</TableHead>
+                      <TableHead className="text-right">Gaji Bersih Dibayarkan</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

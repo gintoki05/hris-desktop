@@ -74,6 +74,7 @@ export type PayslipSendStatus =
 export type PayslipManagerWhatsappStatus = "not_opened" | "opened" | "sent_manual" | "failed" | "missing_number";
 export type PayslipManagerEmailStatus = "not_sent" | "sent" | "failed" | "missing_email";
 export type PayslipPortalPublishStatus = "not_published" | "published" | "failed";
+export type OwnerSummaryPublishStatusValue = "disabled" | "published" | "failed";
 
 export type PayslipImportSnapshotInput = {
   id?: string;
@@ -151,6 +152,24 @@ export type PayslipPortalPublishResult = {
   items: PayslipPortalPublishItemResult[];
 };
 
+export type OwnerSummaryPublishStatus = {
+  periodId: string;
+  payrollPeriod: string;
+  periodStart: string;
+  periodEnd: string;
+  employeeCount: number;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+  payslipPublishedCount: number;
+  payslipFailedCount: number;
+  status: OwnerSummaryPublishStatusValue;
+  portalSummaryId: string;
+  errorMessage: string;
+  publishedAt: string | null;
+  updatedAt: string;
+};
+
 export type PayslipPortalPublishItemResult = {
   snapshotId: string;
   employeeName: string;
@@ -162,6 +181,12 @@ export type PayslipPortalPublishItemResult = {
 export type PayslipPortalStatusResult = {
   periodId: string;
   items: PayslipPortalStatusItem[];
+};
+
+export type DeletedPayslipPeriod = {
+  periodId: string;
+  deletedPayrollRunCount: number;
+  safetyBackupPath: string;
 };
 
 export type PayslipPortalStatusItem = {

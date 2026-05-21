@@ -72,6 +72,11 @@ pub struct LatestFinalizedManualPayrollQueryDto {
     period_start: String,
 }
 
+#[derive(Deserialize)]
+pub struct LatestManualPayrollQueryDto {
+    period_start: String,
+}
+
 #[derive(Serialize)]
 pub struct ManualPayrollDraftDto {
     payroll_run_id: String,
@@ -162,6 +167,21 @@ pub fn get_latest_finalized_manual_payroll_before(
     payroll_service::get_latest_finalized_manual_payroll_before(
         &app,
         payroll_service::LatestFinalizedManualPayrollQuery {
+            period_start: query.period_start,
+        },
+    )
+    .map(|draft| draft.map(to_manual_payroll_draft_dto))
+    .map_err(|error| error.user_message())
+}
+
+#[tauri::command]
+pub fn get_latest_manual_payroll_before(
+    app: AppHandle,
+    query: LatestManualPayrollQueryDto,
+) -> Result<Option<ManualPayrollDraftDto>, String> {
+    payroll_service::get_latest_manual_payroll_before(
+        &app,
+        payroll_service::LatestManualPayrollQuery {
             period_start: query.period_start,
         },
     )

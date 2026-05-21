@@ -131,6 +131,19 @@ pub struct PayslipEmailInputDto {
     actor: PayslipManagerActorDto,
 }
 
+#[derive(Deserialize)]
+pub struct PayslipPeriodDeleteInputDto {
+    period_id: String,
+    actor: PayslipManagerActorDto,
+}
+
+#[derive(Serialize)]
+pub struct DeletedPayslipPeriodDto {
+    period_id: String,
+    deleted_payroll_run_count: i64,
+    safety_backup_path: String,
+}
+
 #[tauri::command]
 pub fn list_payslip_periods(app: AppHandle) -> Result<Vec<PayslipPeriodDto>, String> {
     payslip_manager_service::list_payslip_periods(&app)
@@ -242,6 +255,22 @@ pub fn send_payslip_manager_email(
     .map_err(|error| error.user_message())
 }
 
+#[tauri::command]
+pub fn delete_payslip_period(
+    app: AppHandle,
+    input: PayslipPeriodDeleteInputDto,
+) -> Result<DeletedPayslipPeriodDto, String> {
+    payslip_manager_service::delete_payslip_period(
+        &app,
+        payslip_manager_service::PayslipPeriodDeleteInput {
+            period_id: input.period_id,
+            actor: to_actor(input.actor),
+        },
+    )
+    .map(to_deleted_period_dto)
+    .map_err(|error| error.user_message())
+}
+
 fn to_import_batch_input(
     input: PayslipImportBatchInputDto,
 ) -> payslip_manager_service::PayslipImportBatchInput {
@@ -338,5 +367,15 @@ fn to_snapshot_dto(snapshot: payslip_manager_service::PayslipSnapshot) -> Paysli
         status_updated_at: snapshot.status_updated_at,
         created_at: snapshot.created_at,
         updated_at: snapshot.updated_at,
+    }
+}
+
+fn to_deleted_period_dto(
+    period: payslip_manager_service::DeletedPayslipPeriod,
+) -> DeletedPayslipPeriodDto {
+    DeletedPayslipPeriodDto {
+        period_id: period.period_id,
+        deleted_payroll_run_count: period.deleted_payroll_run_count,
+        safety_backup_path: period.safety_backup_path,
     }
 }

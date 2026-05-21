@@ -71,6 +71,25 @@ pub struct PayslipPortalStatusResultDto {
 }
 
 #[derive(Serialize)]
+pub struct OwnerSummaryPublishStatusDto {
+    period_id: String,
+    payroll_period: String,
+    period_start: String,
+    period_end: String,
+    employee_count: i64,
+    gross_pay: i64,
+    total_deductions: i64,
+    net_pay: i64,
+    payslip_published_count: i64,
+    payslip_failed_count: i64,
+    status: String,
+    portal_summary_id: String,
+    error_message: String,
+    published_at: Option<String>,
+    updated_at: String,
+}
+
+#[derive(Serialize)]
 pub struct PayslipPortalStatusItemDto {
     snapshot_id: String,
     employee_name: String,
@@ -152,6 +171,26 @@ pub fn publish_final_payslips_to_portal(
         },
     )
     .map(to_result_dto)
+    .map_err(|error| error.user_message())
+}
+
+#[tauri::command]
+pub fn get_owner_summary_publish_status(
+    app: AppHandle,
+    input: PayslipPortalStatusInputDto,
+) -> Result<Option<OwnerSummaryPublishStatusDto>, String> {
+    payslip_portal_publish_service::get_owner_summary_publish_status(
+        &app,
+        payslip_portal_publish_service::PayslipPortalStatusInput {
+            period_id: input.period_id,
+            actor: payslip_portal_publish_service::PayslipPortalPublishActor {
+                user_id: input.actor.user_id,
+                display_name: input.actor.display_name,
+                role: input.actor.role,
+            },
+        },
+    )
+    .map(|status| status.map(to_owner_summary_status_dto))
     .map_err(|error| error.user_message())
 }
 
@@ -288,6 +327,28 @@ fn to_status_result_dto(
     PayslipPortalStatusResultDto {
         period_id: result.period_id,
         items: result.items.into_iter().map(to_status_item_dto).collect(),
+    }
+}
+
+fn to_owner_summary_status_dto(
+    status: payslip_portal_publish_service::OwnerSummaryPublishStatus,
+) -> OwnerSummaryPublishStatusDto {
+    OwnerSummaryPublishStatusDto {
+        period_id: status.period_id,
+        payroll_period: status.payroll_period,
+        period_start: status.period_start,
+        period_end: status.period_end,
+        employee_count: status.employee_count,
+        gross_pay: status.gross_pay,
+        total_deductions: status.total_deductions,
+        net_pay: status.net_pay,
+        payslip_published_count: status.payslip_published_count,
+        payslip_failed_count: status.payslip_failed_count,
+        status: status.status,
+        portal_summary_id: status.portal_summary_id,
+        error_message: status.error_message,
+        published_at: status.published_at,
+        updated_at: status.updated_at,
     }
 }
 

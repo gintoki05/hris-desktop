@@ -3,6 +3,7 @@ import {
   finalizeManualPayroll as finalizeManualPayrollWithRepository,
   getFinalizedManualPayroll,
   getLatestFinalizedManualPayrollBefore,
+  getLatestManualPayrollBefore,
   getManualPayrollDraft,
   saveManualPayrollDraft,
 } from "../repositories/tauri-payroll.repository";
@@ -53,7 +54,7 @@ export async function saveManualPayrollDraftInput(draft: ManualPayrollDraft) {
 }
 
 export { getFinalizedManualPayroll, getManualPayrollDraft };
-export { getLatestFinalizedManualPayrollBefore };
+export { getLatestFinalizedManualPayrollBefore, getLatestManualPayrollBefore };
 
 function validateManualPayrollDraft(draft: ManualPayrollDraft): void {
   if (!draft.period.label.trim()) {

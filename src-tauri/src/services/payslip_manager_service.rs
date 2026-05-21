@@ -14,7 +14,9 @@ use tauri::{AppHandle, Manager};
 
 use crate::{
     error::AppError,
-    services::{database_service, payslip_pdf_logo::parse_logo_data_url, settings_service},
+    services::{
+        backup_service, database_service, payslip_pdf_logo::parse_logo_data_url, settings_service,
+    },
 };
 
 #[derive(Clone, Deserialize)]
@@ -137,6 +139,19 @@ pub struct PayslipPdfGenerationInput {
 pub struct PayslipEmailInput {
     pub snapshot_id: String,
     pub actor: PayslipManagerActor,
+}
+
+#[derive(Deserialize)]
+pub struct PayslipPeriodDeleteInput {
+    pub period_id: String,
+    pub actor: PayslipManagerActor,
+}
+
+#[derive(Serialize)]
+pub struct DeletedPayslipPeriod {
+    pub period_id: String,
+    pub deleted_payroll_run_count: i64,
+    pub safety_backup_path: String,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -590,6 +605,82 @@ pub fn send_payslip_email(
     update_payslip_snapshot_email_status(app, &snapshot.id, "sent", "")
 }
 
+pub fn delete_payslip_period(
+    app: &AppHandle,
+    input: PayslipPeriodDeleteInput,
+) -> Result<DeletedPayslipPeriod, AppError> {
+    database_service::initialize_local_database(app)?;
+    validate_actor(&input.actor)?;
+
+    let period_id = input.period_id.trim().to_string();
+    validate_required("periode slip", &period_id)?;
+
+    let safety_backup_path = backup_service::create_safety_backup(app, "pre-delete-payslip-period")?
+        .map(|path| path.display().to_string())
+        .unwrap_or_default();
+
+    let mut connection = database_service::open_local_connection(app)?;
+    let transaction = connection.transaction()?;
+    let period = transaction
+        .query_row(
+            "
+            SELECT id, label, start_date, end_date, status, created_at, updated_at
+            FROM payslip_periods
+            WHERE id = ?1
+            ",
+            [&period_id],
+            payslip_period_from_row,
+        )
+        .optional()?
+        .ok_or_else(|| AppError::Database("periode slip tidak ditemukan".to_string()))?;
+
+    ensure_payslip_period_not_published(&transaction, &period.id)?;
+
+    let payroll_run_ids = list_payroll_runs_for_payslip_period(&transaction, &period.id)?;
+    for run_id in &payroll_run_ids {
+        transaction.execute(
+            "
+            DELETE FROM payroll_payslip_delivery_statuses
+            WHERE payslip_snapshot_id IN (
+                SELECT id FROM payroll_payslip_snapshots WHERE payroll_run_id = ?1
+            )
+            ",
+            [run_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM payroll_payslip_snapshots WHERE payroll_run_id = ?1",
+            [run_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM payroll_manual_draft_items WHERE payroll_run_id = ?1",
+            [run_id],
+        )?;
+    }
+
+    transaction.execute(
+        "DELETE FROM owner_summary_publish_statuses WHERE period_id = ?1",
+        [&period.id],
+    )?;
+    transaction.execute("DELETE FROM payslip_snapshots WHERE period_id = ?1", [&period.id])?;
+    transaction.execute(
+        "DELETE FROM payslip_import_batches WHERE period_id = ?1",
+        [&period.id],
+    )?;
+
+    for run_id in &payroll_run_ids {
+        transaction.execute("DELETE FROM payroll_runs WHERE id = ?1", [run_id])?;
+    }
+
+    transaction.execute("DELETE FROM payslip_periods WHERE id = ?1", [&period.id])?;
+    transaction.commit()?;
+
+    Ok(DeletedPayslipPeriod {
+        period_id,
+        deleted_payroll_run_count: payroll_run_ids.len() as i64,
+        safety_backup_path,
+    })
+}
+
 fn update_payslip_snapshot_email_status(
     app: &AppHandle,
     snapshot_id: &str,
@@ -669,6 +760,8 @@ fn get_payslip_snapshot(
                 net_pay, pdf_file_path, send_status, whatsapp_status, email_status,
                 whatsapp_opened_at, whatsapp_sent_at, whatsapp_failed_at,
                 email_sent_at, email_failed_at, email_error_message,
+                portal_publish_status, portal_published_at, portal_storage_path,
+                portal_payslip_id, portal_error_message,
                 status_updated_at, created_at, updated_at
             FROM payslip_snapshots
             WHERE id = ?1
@@ -749,6 +842,73 @@ where
     }
 
     Ok(values)
+}
+
+fn ensure_payslip_period_not_published(
+    connection: &rusqlite::Connection,
+    period_id: &str,
+) -> Result<(), AppError> {
+    let published_snapshot_count: i64 = connection.query_row(
+        "
+        SELECT COUNT(*)
+        FROM payslip_snapshots
+        WHERE period_id = ?1
+            AND (
+                portal_publish_status = 'published'
+                OR portal_published_at IS NOT NULL
+                OR trim(portal_storage_path) != ''
+                OR trim(portal_payslip_id) != ''
+            )
+        ",
+        [period_id],
+        |row| row.get(0),
+    )?;
+
+    if published_snapshot_count > 0 {
+        return Err(AppError::Database(
+            "periode tidak boleh dihapus karena ada slip yang sudah dikirim ke portal".to_string(),
+        ));
+    }
+
+    let published_owner_summary_count: i64 = connection.query_row(
+        "
+        SELECT COUNT(*)
+        FROM owner_summary_publish_statuses
+        WHERE period_id = ?1
+            AND (
+                status = 'published'
+                OR published_at IS NOT NULL
+                OR trim(portal_summary_id) != ''
+            )
+        ",
+        [period_id],
+        |row| row.get(0),
+    )?;
+
+    if published_owner_summary_count > 0 {
+        return Err(AppError::Database(
+            "periode tidak boleh dihapus karena laporan manajemen sudah dikirim ke portal"
+                .to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn list_payroll_runs_for_payslip_period(
+    connection: &rusqlite::Connection,
+    period_id: &str,
+) -> Result<Vec<String>, AppError> {
+    let mut statement = connection.prepare(
+        "
+        SELECT run.id
+        FROM payslip_import_batches batch
+        JOIN payroll_runs run ON batch.id = run.id || '-payroll-final'
+        WHERE batch.period_id = ?1
+        ",
+    )?;
+    let rows = statement.query_map([period_id], |row| row.get::<_, String>(0))?;
+    collect_rows(rows)
 }
 
 fn sync_finalized_payroll_runs(connection: &rusqlite::Connection) -> Result<(), AppError> {

@@ -755,6 +755,34 @@ const MIGRATIONS: &[Migration] = &[
     ",
     },
     Migration {
+        id: "202605210003_owner_summary_publish_status",
+        sql: "
+        CREATE TABLE IF NOT EXISTS owner_summary_publish_statuses (
+            period_id TEXT PRIMARY KEY,
+            payroll_period TEXT NOT NULL,
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            employee_count INTEGER NOT NULL DEFAULT 0 CHECK (employee_count >= 0),
+            gross_pay INTEGER NOT NULL DEFAULT 0,
+            total_deductions INTEGER NOT NULL DEFAULT 0,
+            net_pay INTEGER NOT NULL DEFAULT 0,
+            payslip_published_count INTEGER NOT NULL DEFAULT 0 CHECK (payslip_published_count >= 0),
+            payslip_failed_count INTEGER NOT NULL DEFAULT 0 CHECK (payslip_failed_count >= 0),
+            status TEXT NOT NULL CHECK (status IN ('disabled', 'published', 'failed')),
+            portal_summary_id TEXT NOT NULL DEFAULT '',
+            error_message TEXT NOT NULL DEFAULT '',
+            published_at TEXT,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (period_id) REFERENCES payslip_periods(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_owner_summary_publish_statuses_status
+            ON owner_summary_publish_statuses(status);
+        CREATE INDEX IF NOT EXISTS idx_owner_summary_publish_statuses_period_dates
+            ON owner_summary_publish_statuses(period_start, period_end);
+    ",
+    },
+    Migration {
         id: "202605160001_seed_local_auth_users",
         sql: "
         INSERT OR IGNORE INTO auth_users (

@@ -22,10 +22,13 @@ import { formatRupiah } from "../../../lib/formatters/currency";
 import {
   formatDisplayDateRange,
   formatDisplayDateText,
+  formatLocalDateTimeFromUtc,
 } from "../../../lib/formatters/date-time";
 import type { AuthSession } from "../../auth/types";
 import {
+  deletePayslipPeriod,
   generatePayslipPdfs,
+  getOwnerSummaryPublishStatus,
   listPayslipPeriods,
   listPayslipSnapshots,
   publishFinalPayslipsToPortal,
@@ -36,6 +39,7 @@ import {
   maskWhatsAppNumber,
 } from "../services/whatsapp-delivery.service";
 import type {
+  OwnerSummaryPublishStatus,
   PayslipManagerSnapshot,
   PayslipPeriod,
 } from "../types";
@@ -66,7 +70,14 @@ const PORTAL_STATUS_LABELS: Record<PayslipManagerSnapshot["portalPublishStatus"]
   published: "Terkirim",
 };
 
+const OWNER_SUMMARY_STATUS_LABELS: Record<OwnerSummaryPublishStatus["status"], string> = {
+  disabled: "Nonaktif",
+  failed: "Gagal",
+  published: "Sukses",
+};
+
 const PERIOD_PAGE_SIZE = 5;
+const OWNER_PORTAL_URL = "https://karyawan.permatamedikaplg.com";
 
 export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelProps) {
   const [periods, setPeriods] = useState<PayslipPeriod[]>([]);
@@ -77,7 +88,10 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
   const [isRegeneratingPdf, setIsRegeneratingPdf] = useState(false);
   const [isPublishingPortal, setIsPublishingPortal] = useState(false);
+  const [isDeletingPeriod, setIsDeletingPeriod] = useState(false);
+  const [periodPendingDeletion, setPeriodPendingDeletion] = useState<PayslipPeriod | null>(null);
   const [updatingSnapshotId, setUpdatingSnapshotId] = useState<string | null>(null);
+  const [ownerSummaryStatus, setOwnerSummaryStatus] = useState<OwnerSummaryPublishStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -88,11 +102,20 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
   useEffect(() => {
     if (!selectedPeriodId) {
       setSnapshots([]);
+      setOwnerSummaryStatus(null);
+      setPeriodPendingDeletion(null);
       return;
     }
 
     void refreshSnapshots(selectedPeriodId);
-  }, [selectedPeriodId]);
+    void refreshOwnerSummaryStatus(selectedPeriodId);
+  }, [canEdit, selectedPeriodId]);
+
+  useEffect(() => {
+    if (periodPendingDeletion && periodPendingDeletion.id !== selectedPeriodId) {
+      setPeriodPendingDeletion(null);
+    }
+  }, [periodPendingDeletion, selectedPeriodId]);
 
   const selectedPeriod = useMemo(
     () => periods.find((period) => period.id === selectedPeriodId) ?? null,
@@ -118,9 +141,17 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       undelivered: snapshots.filter((snapshot) => snapshot.whatsappStatus !== "sent_manual").length,
       portalPublished: snapshots.filter((snapshot) => snapshot.portalPublishStatus === "published").length,
       portalFailed: snapshots.filter((snapshot) => snapshot.portalPublishStatus === "failed").length,
+      totalNetPay: snapshots.reduce((total, snapshot) => total + snapshot.netPay, 0),
     }),
     [snapshots],
   );
+  const ownerSummaryEmployeeCount = ownerSummaryStatus?.employeeCount ?? summary.employeeCount;
+  const ownerSummaryNetPay = ownerSummaryStatus?.netPay ?? summary.totalNetPay;
+  const ownerSummaryPublishedCount = ownerSummaryStatus?.payslipPublishedCount ?? summary.portalPublished;
+  const ownerSummaryFailedCount = ownerSummaryStatus?.payslipFailedCount ?? summary.portalFailed;
+  const ownerSummaryStatusLabel = ownerSummaryStatus
+    ? OWNER_SUMMARY_STATUS_LABELS[ownerSummaryStatus.status]
+    : "Belum ada status";
   const canRegeneratePdf = canEdit
     && selectedPeriod !== null
     && snapshots.length > 0
@@ -132,6 +163,19 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     && summary.pdfReady === snapshots.length
     && !isLoadingSnapshots
     && !isPublishingPortal;
+  const isSelectedPeriodPublishedToPortal =
+    summary.portalPublished > 0 || ownerSummaryStatus?.status === "published";
+  const canDeletePeriod = canEdit
+    && selectedPeriod !== null
+    && !isLoadingPeriods
+    && !isLoadingSnapshots
+    && !isPublishingPortal
+    && !isRegeneratingPdf
+    && !isDeletingPeriod
+    && !isSelectedPeriodPublishedToPortal;
+  const deletePeriodDisabledReason = isSelectedPeriodPublishedToPortal
+    ? "Periode sudah pernah dikirim ke portal dan tidak boleh dihapus dari menu normal."
+    : "Hapus hanya tersedia untuk periode yang belum dikirim ke portal.";
   async function refreshPeriods() {
     setIsLoadingPeriods(true);
     setErrorMessage(null);
@@ -140,7 +184,13 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       const nextPeriods = await listPayslipPeriods();
       setPeriods(nextPeriods);
       setPeriodPage(1);
-      setSelectedPeriodId((current) => current ?? nextPeriods[0]?.id ?? null);
+      setSelectedPeriodId((current) => {
+        if (current && nextPeriods.some((period) => period.id === current)) {
+          return current;
+        }
+
+        return nextPeriods[0]?.id ?? null;
+      });
     } catch (error: unknown) {
       setErrorMessage(getErrorMessage(error, "Periode slip gagal dibaca."));
     } finally {
@@ -158,6 +208,20 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       setErrorMessage(getErrorMessage(error, "Daftar slip karyawan gagal dibaca."));
     } finally {
       setIsLoadingSnapshots(false);
+    }
+  }
+
+  async function refreshOwnerSummaryStatus(periodId: string) {
+    if (!canEdit) {
+      setOwnerSummaryStatus(null);
+      return;
+    }
+
+    try {
+      setOwnerSummaryStatus(await getOwnerSummaryPublishStatus(periodId, session));
+    } catch (error: unknown) {
+      setOwnerSummaryStatus(null);
+      setErrorMessage(getErrorMessage(error, "Status laporan manajemen gagal dibaca."));
     }
   }
 
@@ -197,6 +261,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
     try {
       const result = await publishFinalPayslipsToPortal(selectedPeriod.id, session);
       await refreshSnapshots(selectedPeriod.id);
+      await refreshOwnerSummaryStatus(selectedPeriod.id);
       const ownerSummaryMessage = result.ownerSummaryStatus === "published"
         ? " Laporan manajemen ikut dikirim."
         : result.ownerSummaryStatus === "failed"
@@ -217,6 +282,47 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
       setErrorMessage(getErrorMessage(error, "Kirim slip ke portal gagal."));
     } finally {
       setIsPublishingPortal(false);
+    }
+  }
+
+  function handleRequestDeletePeriod() {
+    if (!selectedPeriod || !canDeletePeriod) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setPeriodPendingDeletion(selectedPeriod);
+  }
+
+  async function handleConfirmDeletePeriod() {
+    if (!periodPendingDeletion || !canDeletePeriod) {
+      return;
+    }
+
+    setIsDeletingPeriod(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const deletedPeriodId = periodPendingDeletion.id;
+      const deleted = await deletePayslipPeriod(deletedPeriodId, session);
+      const remainingPeriods = periods.filter((period) => period.id !== deletedPeriodId);
+      setSnapshots([]);
+      setOwnerSummaryStatus(null);
+      setPeriodPendingDeletion(null);
+      setPeriods(remainingPeriods);
+      setSelectedPeriodId(remainingPeriods[0]?.id ?? null);
+      await refreshPeriods();
+      setSuccessMessage(
+        deleted.deletedPayrollRunCount > 0
+          ? "Periode payroll dan slip lokal berhasil dihapus. Safety backup database sudah dibuat."
+          : "Periode slip lokal berhasil dihapus. Safety backup database sudah dibuat.",
+      );
+    } catch (error: unknown) {
+      setErrorMessage(getErrorMessage(error, "Periode slip gagal dihapus."));
+    } finally {
+      setIsDeletingPeriod(false);
     }
   }
 
@@ -427,6 +533,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             <span>Portal gagal: <strong>{summary.portalFailed}</strong></span>
             <Button
               disabled={!canRegeneratePdf}
+              className="payslip-action-button payslip-action-button--pdf"
               onClick={() => void handleRegeneratePdf()}
               size="sm"
               type="button"
@@ -436,6 +543,7 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             </Button>
             <Button
               disabled={!canPublishPortal}
+              className="payslip-action-button payslip-action-button--portal"
               onClick={() => void handlePublishPortal()}
               size="sm"
               type="button"
@@ -443,6 +551,86 @@ export function PayslipManagerPanel({ canEdit, session }: PayslipManagerPanelPro
             >
               {isPublishingPortal ? "Mengirim..." : "Kirim ke Portal"}
             </Button>
+            <Button
+              disabled={!canDeletePeriod}
+              className="payslip-action-button payslip-action-button--delete"
+              onClick={handleRequestDeletePeriod}
+              size="sm"
+              title={deletePeriodDisabledReason}
+              type="button"
+              variant="destructive"
+            >
+              {isDeletingPeriod ? "Menghapus..." : "Hapus Periode"}
+            </Button>
+          </div>
+
+          {periodPendingDeletion ? (
+            <AppNotice title="Konfirmasi Hapus Periode" variant="warning">
+              <div className="payslip-delete-alert">
+                <span>
+                  Periode <strong>{periodPendingDeletion.label}</strong> akan dihapus dari data payroll/slip lokal.
+                  Safety backup database akan dibuat dulu. Periode yang sudah terkirim ke portal tetap akan ditolak.
+                </span>
+                <div>
+                  <Button
+                    disabled={isDeletingPeriod}
+                    onClick={() => setPeriodPendingDeletion(null)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    disabled={isDeletingPeriod}
+                    onClick={() => void handleConfirmDeletePeriod()}
+                    size="sm"
+                    type="button"
+                    variant="destructive"
+                  >
+                    {isDeletingPeriod ? "Menghapus..." : "Ya, Hapus"}
+                  </Button>
+                </div>
+              </div>
+            </AppNotice>
+          ) : null}
+
+          <div className="owner-summary-status" aria-label="Status publish laporan manajemen">
+            <div>
+              <span>Portal Manajemen</span>
+              <a href={OWNER_PORTAL_URL} rel="noreferrer" target="_blank">
+                karyawan.permatamedikaplg.com
+              </a>
+            </div>
+            <div>
+              <span>Periode terakhir publish</span>
+              <strong>
+                {ownerSummaryStatus?.publishedAt
+                  ? `${ownerSummaryStatus.payrollPeriod} - ${formatLocalDateTimeFromUtc(ownerSummaryStatus.publishedAt)}`
+                  : "-"}
+              </strong>
+            </div>
+            <div>
+              <span>Status laporan</span>
+              <strong data-status={ownerSummaryStatus?.status ?? "idle"}>{ownerSummaryStatusLabel}</strong>
+              {ownerSummaryStatus?.status === "failed" ? (
+                <small>{ownerSummaryStatus.errorMessage || "Laporan manajemen gagal dikirim."}</small>
+              ) : null}
+            </div>
+            <div>
+              <span>Jumlah karyawan</span>
+              <strong>{ownerSummaryEmployeeCount}</strong>
+            </div>
+            <div>
+              <span>Total gaji bersih dibayarkan</span>
+              <strong>{formatRupiah(ownerSummaryNetPay)}</strong>
+            </div>
+            <div>
+              <span>Slip terkirim / gagal</span>
+              <strong>
+                {ownerSummaryPublishedCount} / {ownerSummaryFailedCount}
+              </strong>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-background">

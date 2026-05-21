@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  DeletedPayslipPeriod,
+  OwnerSummaryPublishStatus,
   PayslipImportBatch,
   PayslipImportBatchInput,
   PayslipManagerSnapshot,
@@ -100,6 +102,24 @@ type PayslipPortalStatusResultDto = {
   items: PayslipPortalStatusItemDto[];
 };
 
+type OwnerSummaryPublishStatusDto = {
+  period_id: string;
+  payroll_period: string;
+  period_start: string;
+  period_end: string;
+  employee_count: number;
+  gross_pay: number;
+  total_deductions: number;
+  net_pay: number;
+  payslip_published_count: number;
+  payslip_failed_count: number;
+  status: OwnerSummaryPublishStatus["status"];
+  portal_summary_id: string;
+  error_message: string;
+  published_at: string | null;
+  updated_at: string;
+};
+
 type PayslipPortalStatusItemDto = {
   snapshot_id: string;
   employee_name: string;
@@ -112,6 +132,12 @@ type PayslipPortalStatusItemDto = {
   portal_payslip_id: string;
   published_at: string | null;
   error_message: string;
+};
+
+type DeletedPayslipPeriodDto = {
+  period_id: string;
+  deleted_payroll_run_count: number;
+  safety_backup_path: string;
 };
 
 export async function listPayslipPeriods(): Promise<PayslipPeriod[]> {
@@ -259,6 +285,40 @@ export async function publishFinalPayslipsToPortal(
   };
 }
 
+export async function getOwnerSummaryPublishStatus(
+  periodId: string,
+  actor: PayslipManagerActor,
+): Promise<OwnerSummaryPublishStatus | null> {
+  ensureTauriRuntime();
+  const dto = await invoke<OwnerSummaryPublishStatusDto | null>("get_owner_summary_publish_status", {
+    input: {
+      period_id: periodId,
+      actor: toActorDto(actor),
+    },
+  });
+
+  return dto ? toOwnerSummaryPublishStatus(dto) : null;
+}
+
+export async function deletePayslipPeriod(
+  periodId: string,
+  actor: PayslipManagerActor,
+): Promise<DeletedPayslipPeriod> {
+  ensureTauriRuntime();
+  const dto = await invoke<DeletedPayslipPeriodDto>("delete_payslip_period", {
+    input: {
+      period_id: periodId,
+      actor: toActorDto(actor),
+    },
+  });
+
+  return {
+    periodId: dto.period_id,
+    deletedPayrollRunCount: dto.deleted_payroll_run_count,
+    safetyBackupPath: dto.safety_backup_path,
+  };
+}
+
 export async function listPayslipPortalStatus(
   periodId: string,
   actor: PayslipManagerActor,
@@ -286,6 +346,26 @@ export async function listPayslipPortalStatus(
       publishedAt: item.published_at,
       errorMessage: item.error_message,
     })),
+  };
+}
+
+function toOwnerSummaryPublishStatus(dto: OwnerSummaryPublishStatusDto): OwnerSummaryPublishStatus {
+  return {
+    periodId: dto.period_id,
+    payrollPeriod: dto.payroll_period,
+    periodStart: dto.period_start,
+    periodEnd: dto.period_end,
+    employeeCount: dto.employee_count,
+    grossPay: dto.gross_pay,
+    totalDeductions: dto.total_deductions,
+    netPay: dto.net_pay,
+    payslipPublishedCount: dto.payslip_published_count,
+    payslipFailedCount: dto.payslip_failed_count,
+    status: dto.status,
+    portalSummaryId: dto.portal_summary_id,
+    errorMessage: dto.error_message,
+    publishedAt: dto.published_at,
+    updatedAt: dto.updated_at,
   };
 }
 

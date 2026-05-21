@@ -82,6 +82,25 @@ pub struct PayslipPortalStatusResult {
 }
 
 #[derive(Serialize)]
+pub struct OwnerSummaryPublishStatus {
+    pub period_id: String,
+    pub payroll_period: String,
+    pub period_start: String,
+    pub period_end: String,
+    pub employee_count: i64,
+    pub gross_pay: i64,
+    pub total_deductions: i64,
+    pub net_pay: i64,
+    pub payslip_published_count: i64,
+    pub payslip_failed_count: i64,
+    pub status: String,
+    pub portal_summary_id: String,
+    pub error_message: String,
+    pub published_at: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Serialize)]
 pub struct PayslipPortalStatusItem {
     pub snapshot_id: String,
     pub employee_name: String,
@@ -252,6 +271,21 @@ struct LocalOwnerPortalUser {
     portal_user_id: String,
 }
 
+struct OwnerPayrollSummaryData {
+    period_id: String,
+    payroll_period: String,
+    period_start: String,
+    period_end: String,
+    employee_count: i64,
+    gross_pay: i64,
+    total_deductions: i64,
+    net_pay: i64,
+    income_components: BTreeMap<String, i64>,
+    deduction_components: BTreeMap<String, i64>,
+    payslip_published_count: i64,
+    payslip_failed_count: i64,
+}
+
 pub fn publish_final_payslips_to_portal(
     app: &AppHandle,
     input: PayslipPortalPublishInput,
@@ -314,24 +348,47 @@ pub fn publish_final_payslips_to_portal(
     }
     let failed_count = items.len().saturating_sub(published_count);
     let (owner_summary_status, owner_summary_id, owner_summary_error_message) =
-        if config.owner_summary_enabled {
-            match publish_owner_payroll_summary(
-                &client,
-                &config,
-                &period_id,
-                &snapshots,
-                published_count + skipped_count,
-                failed_count,
-            ) {
-                Ok(summary_id) => ("published".to_string(), summary_id, String::new()),
-                Err(error) => (
-                    "failed".to_string(),
-                    String::new(),
-                    sanitize_error_message(&error.user_message()),
-                ),
+        match build_owner_payroll_summary_data(
+            &period_id,
+            &snapshots,
+            published_count + skipped_count,
+            failed_count,
+            config.payslips_enabled,
+        ) {
+            Ok(summary) if config.owner_summary_enabled => {
+                match publish_owner_payroll_summary(&client, &config, &summary) {
+                    Ok(summary_id) => {
+                        save_owner_summary_publish_status(
+                            &connection,
+                            &summary,
+                            "published",
+                            &summary_id,
+                            "",
+                        )?;
+                        ("published".to_string(), summary_id, String::new())
+                    }
+                    Err(error) => {
+                        let message = sanitize_error_message(&error.user_message());
+                        save_owner_summary_publish_status(
+                            &connection,
+                            &summary,
+                            "failed",
+                            "",
+                            &message,
+                        )?;
+                        ("failed".to_string(), String::new(), message)
+                    }
+                }
             }
-        } else {
-            ("disabled".to_string(), String::new(), String::new())
+            Ok(summary) => {
+                save_owner_summary_publish_status(&connection, &summary, "disabled", "", "")?;
+                ("disabled".to_string(), String::new(), String::new())
+            }
+            Err(error) => (
+                "failed".to_string(),
+                String::new(),
+                sanitize_error_message(&error.user_message()),
+            ),
         };
 
     Ok(PayslipPortalPublishResult {
@@ -345,6 +402,68 @@ pub fn publish_final_payslips_to_portal(
         owner_summary_error_message,
         items,
     })
+}
+
+pub fn get_owner_summary_publish_status(
+    app: &AppHandle,
+    input: PayslipPortalStatusInput,
+) -> Result<Option<OwnerSummaryPublishStatus>, AppError> {
+    database_service::initialize_local_database(app)?;
+    validate_actor(&input.actor)?;
+    let period_id = input.period_id.trim().to_string();
+    if period_id.is_empty() {
+        return Err(AppError::Database("periode slip wajib dipilih".to_string()));
+    }
+
+    let connection = database_service::open_local_connection(app)?;
+    let result = connection.query_row(
+        "
+        SELECT
+            period_id,
+            payroll_period,
+            period_start,
+            period_end,
+            employee_count,
+            gross_pay,
+            total_deductions,
+            net_pay,
+            payslip_published_count,
+            payslip_failed_count,
+            status,
+            portal_summary_id,
+            error_message,
+            published_at,
+            updated_at
+        FROM owner_summary_publish_statuses
+        WHERE period_id = ?1
+        ",
+        [period_id],
+        |row| {
+            Ok(OwnerSummaryPublishStatus {
+                period_id: row.get(0)?,
+                payroll_period: row.get(1)?,
+                period_start: row.get(2)?,
+                period_end: row.get(3)?,
+                employee_count: row.get(4)?,
+                gross_pay: row.get(5)?,
+                total_deductions: row.get(6)?,
+                net_pay: row.get(7)?,
+                payslip_published_count: row.get(8)?,
+                payslip_failed_count: row.get(9)?,
+                status: row.get(10)?,
+                portal_summary_id: row.get(11)?,
+                error_message: row.get(12)?,
+                published_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
+        },
+    );
+
+    match result {
+        Ok(status) => Ok(Some(status)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(error) => Err(AppError::from(error)),
+    }
 }
 
 pub fn list_payslip_portal_status(
@@ -925,11 +1044,46 @@ fn upsert_payslip_row(
 fn publish_owner_payroll_summary(
     client: &Client,
     config: &PublishConfig,
+    summary: &OwnerPayrollSummaryData,
+) -> Result<String, AppError> {
+    let body = json!({
+        "desktop_period_id": &summary.period_id,
+        "payroll_period": &summary.payroll_period,
+        "period_start": &summary.period_start,
+        "period_end": &summary.period_end,
+        "employee_count": summary.employee_count,
+        "gross_pay": summary.gross_pay,
+        "total_deductions": summary.total_deductions,
+        "net_pay": summary.net_pay,
+        "income_components": to_component_summary_json(summary.income_components.clone()),
+        "deduction_components": to_component_summary_json(summary.deduction_components.clone()),
+        "payslip_published_count": summary.payslip_published_count,
+        "payslip_failed_count": summary.payslip_failed_count
+    });
+    let response = authed_request(
+        client
+            .post(rest_url(config, "payroll_report_summaries"))
+            .query(&[("on_conflict", "desktop_period_id"), ("select", "id")])
+            .header("Prefer", "resolution=merge-duplicates,return=representation")
+            .json(&body),
+        config,
+    )
+    .send()
+    .map_err(|_| AppError::Supabase("kirim laporan manajemen gagal terhubung ke portal".to_string()))?;
+    let rows: Vec<OwnerPayrollSummaryRow> = parse_json_response(response, "kirim laporan manajemen")?;
+    rows.into_iter()
+        .next()
+        .map(|row| row.id)
+        .ok_or_else(|| AppError::Supabase("laporan manajemen tersimpan tetapi konfirmasi tidak diterima".to_string()))
+}
+
+fn build_owner_payroll_summary_data(
     period_id: &str,
     snapshots: &[FinalPayslipSnapshot],
     published_count: usize,
     failed_count: usize,
-) -> Result<String, AppError> {
+    payslips_enabled: bool,
+) -> Result<OwnerPayrollSummaryData, AppError> {
     let first_snapshot = snapshots.first().ok_or_else(|| {
         AppError::Database("periode payroll final belum memiliki snapshot slip".to_string())
     })?;
@@ -966,40 +1120,26 @@ fn publish_owner_payroll_summary(
         .iter()
         .filter(|snapshot| snapshot.portal_publish_status == "published")
         .count();
-    let current_published_count = if config.payslips_enabled {
+    let current_published_count = if payslips_enabled {
         published_count
     } else {
         previously_published_count
     };
-    let body = json!({
-        "desktop_period_id": period_id,
-        "payroll_period": first_snapshot.payroll_period,
-        "period_start": first_snapshot.period_start,
-        "period_end": first_snapshot.period_end,
-        "employee_count": snapshots.len(),
-        "gross_pay": gross_pay,
-        "total_deductions": total_deductions,
-        "net_pay": net_pay,
-        "income_components": to_component_summary_json(income_components),
-        "deduction_components": to_component_summary_json(deduction_components),
-        "payslip_published_count": current_published_count,
-        "payslip_failed_count": failed_count
-    });
-    let response = authed_request(
-        client
-            .post(rest_url(config, "payroll_report_summaries"))
-            .query(&[("on_conflict", "desktop_period_id"), ("select", "id")])
-            .header("Prefer", "resolution=merge-duplicates,return=representation")
-            .json(&body),
-        config,
-    )
-    .send()
-    .map_err(|_| AppError::Supabase("kirim laporan manajemen gagal terhubung ke portal".to_string()))?;
-    let rows: Vec<OwnerPayrollSummaryRow> = parse_json_response(response, "kirim laporan manajemen")?;
-    rows.into_iter()
-        .next()
-        .map(|row| row.id)
-        .ok_or_else(|| AppError::Supabase("laporan manajemen tersimpan tetapi konfirmasi tidak diterima".to_string()))
+
+    Ok(OwnerPayrollSummaryData {
+        period_id: period_id.to_string(),
+        payroll_period: first_snapshot.payroll_period.clone(),
+        period_start: first_snapshot.period_start.clone(),
+        period_end: first_snapshot.period_end.clone(),
+        employee_count: snapshots.len() as i64,
+        gross_pay,
+        total_deductions,
+        net_pay,
+        income_components,
+        deduction_components,
+        payslip_published_count: current_published_count as i64,
+        payslip_failed_count: failed_count as i64,
+    })
 }
 
 fn to_component_summary_json(components: BTreeMap<String, i64>) -> Vec<serde_json::Value> {
@@ -1007,6 +1147,79 @@ fn to_component_summary_json(components: BTreeMap<String, i64>) -> Vec<serde_jso
         .into_iter()
         .map(|(name, amount)| json!({ "name": name, "amount": amount }))
         .collect()
+}
+
+fn save_owner_summary_publish_status(
+    connection: &rusqlite::Connection,
+    summary: &OwnerPayrollSummaryData,
+    status: &str,
+    portal_summary_id: &str,
+    error_message: &str,
+) -> Result<(), AppError> {
+    connection.execute(
+        "
+        INSERT INTO owner_summary_publish_statuses (
+            period_id,
+            payroll_period,
+            period_start,
+            period_end,
+            employee_count,
+            gross_pay,
+            total_deductions,
+            net_pay,
+            payslip_published_count,
+            payslip_failed_count,
+            status,
+            portal_summary_id,
+            error_message,
+            published_at,
+            updated_at
+        )
+        VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
+            CASE WHEN ?11 = 'published' THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') ELSE NULL END,
+            strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        )
+        ON CONFLICT(period_id) DO UPDATE SET
+            payroll_period = excluded.payroll_period,
+            period_start = excluded.period_start,
+            period_end = excluded.period_end,
+            employee_count = excluded.employee_count,
+            gross_pay = excluded.gross_pay,
+            total_deductions = excluded.total_deductions,
+            net_pay = excluded.net_pay,
+            payslip_published_count = excluded.payslip_published_count,
+            payslip_failed_count = excluded.payslip_failed_count,
+            status = excluded.status,
+            portal_summary_id = CASE
+                WHEN excluded.status = 'published' THEN excluded.portal_summary_id
+                ELSE owner_summary_publish_statuses.portal_summary_id
+            END,
+            error_message = excluded.error_message,
+            published_at = CASE
+                WHEN excluded.status = 'published' THEN excluded.published_at
+                ELSE owner_summary_publish_statuses.published_at
+            END,
+            updated_at = excluded.updated_at
+        ",
+        params![
+            &summary.period_id,
+            &summary.payroll_period,
+            &summary.period_start,
+            &summary.period_end,
+            summary.employee_count,
+            summary.gross_pay,
+            summary.total_deductions,
+            summary.net_pay,
+            summary.payslip_published_count,
+            summary.payslip_failed_count,
+            status,
+            portal_summary_id,
+            error_message,
+        ],
+    )?;
+
+    Ok(())
 }
 
 fn list_final_snapshots(
