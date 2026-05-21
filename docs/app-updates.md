@@ -7,7 +7,7 @@ HRIS Payroll Klinik uses the Tauri v2 updater with a static manifest hosted on C
 The app checks this manifest:
 
 ```text
-https://hris-portal-employes.pages.dev/updates/latest.json
+https://hris-desktop-updates.pages.dev/latest.json
 ```
 
 Change `src-tauri/tauri.conf.json` if the production Cloudflare Pages domain is different.
@@ -42,7 +42,7 @@ Use the signature content itself, not a URL to the `.sig` file.
 {
   "version": "0.2.0",
   "pub_date": "2026-05-17T00:00:00Z",
-  "url": "https://hris-portal-employes.pages.dev/updates/windows-x86_64/hris_0.2.0_x64-setup.nsis.zip",
+  "url": "https://hris-desktop-updates.pages.dev/windows-x86_64/hris_0.2.0_x64-setup.nsis.zip",
   "signature": "PASTE_SIGNATURE_FILE_CONTENT_HERE",
   "notes": "Ringkasan perubahan untuk admin payroll."
 }

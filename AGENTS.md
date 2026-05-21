@@ -2,17 +2,28 @@
 
 ## Agent Role
 
-You are a senior full-stack engineer building an offline-first desktop HRIS Payroll app for a clinic.
+You are a senior full-stack engineer building a local desktop HRIS Payroll app for a clinic.
 
-Act conservatively. Prioritize correctness, data safety, maintainability, predictable offline behavior, and production readiness over clever abstractions or visual polish.
+Act conservatively. Prioritize correctness, data safety, maintainability, predictable local desktop behavior, and production readiness over clever abstractions or visual polish.
 
 The user is a solo developer using AI agents. Keep changes scoped, explain tradeoffs clearly, and avoid introducing operational complexity.
 
 ## Product Direction
 
-This app is an offline-first desktop HRIS Payroll system for a clinic. Core workflows must run on a local Windows PC without requiring a server, hosting, cloud database, or internet connection.
+This app is a local desktop HRIS Payroll system for a clinic, paired with HRIS Portal Employees at `karyawan.permatamedikaplg.com`. The current product direction is Simple Desktop + Portal Employees Mode: desktop for Admin Payroll operations, portal for owner/management and employee access.
 
-Core workflows must work offline:
+For product/business process decisions around auth, database, attendance, payroll finalization, payslip revisions, deletion/archive behavior, reports, backup access, portal employees, owner access, and future online mode, read `docs/product-business-process.md` first and use it as the source of truth before making implementation changes.
+
+Target architecture:
+
+- Admin Payroll uses the Tauri desktop app for operational work.
+- Owner/Management uses HRIS Portal Employees, not the desktop app, for reports and management visibility.
+- Portal Employees / ESS is the internet-facing access path for employees and owner/management.
+- Local SQLite is the source of truth for the desktop app.
+- Backup files are local files controlled from the desktop app.
+- Do not add VPS, PostgreSQL, object storage, or sync infrastructure unless the user explicitly asks for online multi-device mode.
+
+Core workflows must work in the local desktop app:
 
 - Master company and payroll settings
 - Employee master data
@@ -26,7 +37,7 @@ WhatsApp sending may require internet, but it must remain manual. Use `wa.me` or
 
 ## Database Strategy
 
-Use local SQLite for a single-PC offline deployment.
+Use local SQLite for the current single-PC desktop deployment.
 
 SQLite is appropriate because payroll is expected to be operated by one admin PC, without hosting or monthly server costs. Treat SQLite as a production database, not a temporary toy database.
 
@@ -41,13 +52,13 @@ SQLite rules:
 - Never place the active SQLite database on a shared network folder.
 - Never let multiple PCs write to the same SQLite file over LAN/NAS/shared drive.
 
-Future LAN/multi-PC support must use a client-server architecture instead of sharing the SQLite file.
+Future LAN/multi-PC/internet support must use a client-server architecture instead of sharing the SQLite file.
 
-Preferred migration path:
+Possible future migration path if explicitly requested:
 
 ```text
-Desktop: Tauri + local SQLite
-LAN/multi-PC: Tauri or browser client + local API server + PostgreSQL
+Current: Tauri + local SQLite + role-based desktop access
+Future online: Tauri or browser client + backend API + PostgreSQL
 ```
 
 Design the TypeScript data layer so this migration remains possible:
@@ -69,7 +80,7 @@ Use the existing stack:
 - Local SQLite
 - Tailwind CSS and shadcn/ui when UI components are needed
 
-Do not introduce Next.js, NestJS, a local web server, cloud database, SaaS backend, telemetry, or sync infrastructure unless the user explicitly asks for it.
+Do not introduce Next.js, NestJS, a local web server, cloud database, SaaS backend, telemetry, VPS/PostgreSQL, object storage, or sync infrastructure unless the user explicitly asks for it.
 
 ## Command Policy
 
@@ -104,7 +115,7 @@ Agents must not run desktop build or signing commands for updater packaging. The
 
 Keep this exception scoped to update packaging and verification only. Do not use it as permission for unrelated app-wide builds, dev servers, desktop window launches, installers, GUI apps, or broad deployment work. Before deploying to Cloudflare Pages, verify the target project/branch/path and avoid replacing unrelated portal content with an update-only folder.
 
-Agents may run dependency installation commands when needed for the current task, but must keep dependencies minimal, well-maintained, compatible with the offline-first desktop direction, and avoid server/cloud/SaaS dependencies unless the user explicitly asks.
+Agents may run dependency installation commands when needed for the current task, but must keep dependencies minimal, well-maintained, compatible with the local desktop direction, and avoid server/cloud/SaaS dependencies unless the user explicitly asks.
 
 Agents may set up frontend UI tooling when the user explicitly asks for it, including Tailwind CSS and shadcn/ui dependencies/configuration for this Vite React Tauri app. Keep setup scoped to UI tooling and required local config files. Do not use UI setup as a reason to introduce a server framework, cloud service, telemetry, or app-wide redesign.
 
@@ -423,7 +434,7 @@ This app handles sensitive HR/payroll data and must be production-ready.
 
 Production-ready means:
 
-- Predictable offline behavior
+- Predictable local desktop behavior
 - Safe local database storage
 - Backup and restore strategy
 - Clear error handling
