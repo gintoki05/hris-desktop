@@ -34,6 +34,29 @@ For production releases, prefer generating a password-protected key and updating
 4. Publish `/updates/latest.json`.
 5. Open the installed app and use `Pengaturan > Update Aplikasi > Cek Update`.
 
+## Local Prepare Script
+
+After the version is updated and the signed Tauri bundle has been built locally, prepare the static updater folder:
+
+```powershell
+.\scripts\prepare-updater-release.ps1
+```
+
+This reads the version from `src-tauri/tauri.conf.json`, expects the matching MSI and `.sig` in `src-tauri\target\release\bundle\msi`, then writes:
+
+```text
+release-updates\<date>\updates\
+release-updates\_deploy_desktop\
+```
+
+To prepare and deploy the update-only folder to Cloudflare Pages:
+
+```powershell
+.\scripts\prepare-updater-release.ps1 -Deploy
+```
+
+The default Cloudflare Pages project is `hris-desktop-updates`, matching the updater endpoint in `src-tauri/tauri.conf.json`.
+
 ## Static Manifest Shape
 
 Use the signature content itself, not a URL to the `.sig` file.
