@@ -42,7 +42,7 @@ After the version is updated and the signed Tauri bundle has been built locally,
 .\scripts\prepare-updater-release.ps1
 ```
 
-This reads the version from `src-tauri/tauri.conf.json`, expects the matching MSI and `.sig` in `src-tauri\target\release\bundle\msi`, then writes:
+This reads the version from `src-tauri/tauri.conf.json`, expects the matching MSI or NSIS installer and `.sig` in `src-tauri\target\release\bundle`, then writes:
 
 ```text
 release-updates\<date>\updates\

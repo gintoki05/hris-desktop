@@ -27,14 +27,24 @@ if ([string]::IsNullOrWhiteSpace($Notes)) {
   $Notes = "Update HRIS Payroll Klinik versi $version."
 }
 
-$bundleDirectory = Join-Path $workspace "src-tauri\target\release\bundle\msi"
-$artifactName = "HRIS Payroll Klinik_${version}_x64_en-US.msi"
-$artifactPath = Join-Path $bundleDirectory $artifactName
-$signaturePath = "$artifactPath.sig"
+$msiBundleDirectory = Join-Path $workspace "src-tauri\target\release\bundle\msi"
+$nsisBundleDirectory = Join-Path $workspace "src-tauri\target\release\bundle\nsis"
+$msiArtifactName = "HRIS Payroll Klinik_${version}_x64_en-US.msi"
+$nsisArtifactName = "HRIS Payroll Klinik_${version}_x64-setup.exe"
+$msiArtifactPath = Join-Path $msiBundleDirectory $msiArtifactName
+$nsisArtifactPath = Join-Path $nsisBundleDirectory $nsisArtifactName
 
-if (-not (Test-Path -LiteralPath $artifactPath)) {
-  throw "Artifact MSI versi $version belum ada. Jalankan npm run build lalu npm run tauri build secara lokal."
+if (Test-Path -LiteralPath $msiArtifactPath) {
+  $artifactName = $msiArtifactName
+  $artifactPath = $msiArtifactPath
+} elseif (Test-Path -LiteralPath $nsisArtifactPath) {
+  $artifactName = $nsisArtifactName
+  $artifactPath = $nsisArtifactPath
+} else {
+  throw "Artifact installer versi $version belum ada. Jalankan npm run build lalu npm run tauri build secara lokal."
 }
+
+$signaturePath = "$artifactPath.sig"
 
 if (-not (Test-Path -LiteralPath $signaturePath)) {
   throw "Signature artifact belum ada: $signaturePath"
@@ -46,6 +56,16 @@ $releaseWindowsDirectory = Join-Path $releaseRoot "windows-x86_64"
 $deployWindowsDirectory = Join-Path $deployRoot "windows-x86_64"
 
 New-Item -ItemType Directory -Force -Path $releaseWindowsDirectory | Out-Null
+
+if (Test-Path -LiteralPath $deployRoot) {
+  $resolvedDeployRoot = Resolve-Path -LiteralPath $deployRoot
+  if (-not $resolvedDeployRoot.Path.StartsWith($workspace.Path)) {
+    throw "Refusing to clean deploy folder outside workspace: $($resolvedDeployRoot.Path)"
+  }
+
+  Get-ChildItem -LiteralPath $resolvedDeployRoot.Path -Force | Remove-Item -Recurse -Force
+}
+
 New-Item -ItemType Directory -Force -Path $deployWindowsDirectory | Out-Null
 
 Copy-Item -LiteralPath $artifactPath -Destination $releaseWindowsDirectory -Force
